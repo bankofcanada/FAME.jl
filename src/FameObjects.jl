@@ -42,38 +42,46 @@ end
 
 A structured type the represents a Fame scalar or series.
 """
-mutable struct FameObject{T}
+mutable struct FameObject{CL, FT, FR, DT}
     name::String
-    class::Symbol
-    type::Symbol
-    freq::Symbol
-    first_period::Period
-    last_period::Period
-    data::T
+    # class::CL
+    # type::FT
+    # freq::FR
+    first_index::Ref{FameIndex}
+    last_index::Ref{FameIndex}
+    first_period::Ref{Period{FR}}
+    last_period::Ref{Period{FR}}
+    data::DT
 end
 
-function FameObject(name, cl, ty, fr) 
-    # try
-        _ty = val_to_symbol(ty, fame_type)
-    # catch
-        # _ty = val_to_symbol(ty, fame_freq)
-    # end
+function FameObject(name, cl, ty, fr, fi=-1, li=-1)
+    _ty = try
+        val_to_symbol(ty, fame_type)
+    catch
+        val_to_symbol(ty, fame_freq)
+    end
     _cl = val_to_symbol(cl, fame_class)
     _fr = val_to_symbol(fr, fame_freq)
     ElType = _ty == :precision ? Float64 :
              _ty == :numeric ? Float32 :
-             _ty == :boolean ? Bool : 
+             _ty == :boolean ? Int32 : 
              _ty == :string ? String :
              _ty == :date ? Int32 :
              _ty == :namelist ? String : 
-                throw(ArgumentError("Can't handle type $_ty.")) 
+             # otherwise _ty is a frequency, so the value is a date
+             FameDate
     T = _cl == :series ? Vector{ElType} :
         _cl == :scalar ? Ref{ElType} :
             throw(ArgumentError("Can't handle class $cl."))
-    return FameObject{T}(name, _cl, _ty, _fr, Period{_fr}(-1), Period{_fr}(-1), T())
+    # return FameObject{_cl, _ty, _fr, T}(name, _cl, _ty, _fr, Period{_fr}(-1), Period{_fr}(-1), T())
+    return FameObject{_cl, _ty, _fr, T}(name, Ref(fi), Ref(li), Ref{Period{_fr}}(), Ref{Period{_fr}}(), T())
 end
 
+function Base.show(io::IO, fo::FameObject{CL, TY, FR,DT}) where {CL,TY,FR,DT}
+    print(io, fo.name, ": ", join((CL, TY, FR, fo.first_period[],fo.last_period[]), ","))
+end
 
+getfreq(::FameObject{CL, FT, FR, DT}) where {CL, FT, FR, DT} = FR
 
 
 
@@ -91,68 +99,8 @@ end
 # Base.show(io::IO, dateYMD::FameDateYMD) = print(io, "$(dateYMD.day)/$(dateYMD.month)/$(dateYMD.year)")
 
 
-# """
-#     QuickInfo
-
-# Structure type that contins the basic meta data about a Fame object.
-# It includes name, class, type, frequency, first and last period.
-# """
-# struct QuickInfo
-#     name::String
-#     class::FameClass
-#     type::FameType
-#     freq::FameFreq
-#     first_period::Period
-#     last_period::Period
-# end
-# function QuickInfo(n, c, t, f, b::FameIndex, e::FameIndex)
-#     fy = Ref{Cint}(-1)
-#     fp = Ref{Cint}(-1)
-#     ly = Ref{Cint}(-1)
-#     lp = Ref{Cint}(-1)
-#     if FameClass(c) != HSERIE
-#         # when not a SERIES the begining and ending index are set to 0
-#         return QuickInfo(n, FameClass(c), FameType(t), FameFreq(f), Period(f, 0, 0), Period(f, 0, 0))
-#     elseif b == FameIndex(FAME_INDEX_NC)
-#         # when SERIES is empty, the begining and ending index are set to -1
-#         return QuickInfo(n, FameClass(c), FameType(t), FameFreq(f), Period(f, -1, -1), Period(f, -1, -1))
-#     else
-#         return QuickInfo(n, FameClass(c), FameType(t), FameFreq(f), Period(f, b), Period(f, e))
-#     end
-# end
-# function Base.show(io::IO, x::QuickInfo)
-#     print(io, x.name * ": ")
-#     show(io, x.type)
-#     print(io, " "); show(io, x.class)
-#     if x.class == HSERIE
-#         print(io, " "); show(io, x.freq)
-#         print(io, " "); show(io, x.first_period)
-#         print(io, " "); show(io, x.last_period)
-#     end
-# end
-# export QuickInfo
-
-# @inline isseries(x::QuickInfo) = isseries(x.class)
-# @inline isscalar(x::QuickInfo) = isscalar(x.class)
-# @inline iscase(x::QuickInfo) = iscase(x.freq)
-# @inline isdate(x::QuickInfo) = isdate(x.type)
-# @inline isnumeric(x::QuickInfo) = isnumeric(x.type)
-# @inline isprecision(x::QuickInfo) = isprecision(x.type)
-# @inline isstring(x::QuickInfo) = isstring(x.type)
-# @inline isboolean(x::QuickInfo) = isboolean(x.type)
-# @inline isnamelist(x::QuickInfo) = isnamelist(x.type)
-
-# struct FameQI
-#     class::FameClass
-#     type::FameType
-#     freq::FameFreq
-#     first::FameIndex
-#     last::FameIndex
-# end
-
-# QuickInfo(name::String, qi::FameQI) = QuickInfo(name, qi.class, qi.type, qi.freq, qi.first, qi.last)
-
-function fame_quick_info(db::FameDatabase, name::String)
+export quick_info
+function quick_info(db::FameDatabase, name::String)
     cl = Ref{Cint}(-1)
     ty = Ref{Cint}(-1)
     fr = Ref{Cint}(-1)
@@ -161,32 +109,80 @@ function fame_quick_info(db::FameDatabase, name::String)
     @fame_call_check(fame_quick_info,
         (Cint, Cstring, Ref{Cint}, Ref{Cint}, Ref{Cint}, Ref{Clonglong}, Ref{Clonglong}),
         db.key, name, cl, ty, fr, findex, lindex)
-    fo = FameObject(name, cl[], ty[], fr[])
-    fo.first_period = Period{fo.freq}(findex[])
-    fo.last_period = Period{fo.freq}(lindex[])
+    fo = FameObject(name, cl[], ty[], fr[], findex[], lindex[])
+    fo.first_period[] = Period{getfreq(fo)}(findex[])
+    fo.last_period[] = Period{getfreq(fo)}(lindex[])
     return fo
 end
 
-# @inline isseries(x::FameQI) = isseries(x.class)
-# @inline isscalar(x::FameQI) = isscalar(x.class)
-# @inline iscase(x::FameQI) = iscase(x.freq)
-# @inline isdate(x::FameQI) = isdate(x.type)
-# @inline isnumeric(x::FameQI) = isnumeric(x.type)
-# @inline isprecision(x::FameQI) = isprecision(x.type)
-# @inline isstring(x::FameQI) = isstring(x.type)
-# @inline isboolean(x::FameQI) = isboolean(x.type)
-# @inline isnamelist(x::FameQI) = isnamelist(x.type)
 
-# """
-#     quick_info(db, obj_name)
+"""
+    listdb(db::FameDatabase, [wc; filters...])
 
-# Read quick information about the named object from the given database.
-# """
-# function quick_info(db::FameDatabase, name::String)
-#     qi = fame_quick_info(db, name)
-#     return QuickInfo(name, qi)
-# end
-# export quick_info
+List objects in the database that match the given wildcard and filters.
+
+The wildcard `wc` is a string containing wildcatd characters. 
+'^' matches any one character while '?' matches any zero or more characters.
+
+The filters:
+  * `alias::Bool` - whether or not to match alias names. 
+  * `class::String` - which class of object to match. Multiple classes can be
+    given in a comma-separated string, e.g., `class="SERIES,SCALAR"`.
+  * `type::String` - same as `class` but for the type of the object
+    ("NUMERIC,PRECISION").
+  * `freq::String` - same as `class` but for the frequency of the object.
+
+"""
+function listdb(db::FameDatabase, wildcard::String = "?";
+    alias::Bool = true, class="", type="", freq="")
+
+    class = string(class)
+    type = string(type)
+    freq = string(freq)
+
+    @cfm_call_check(cfmsopt, (Cstring, Cstring), "ITEM ALIAS", alias ? "ON" : "OFF")
+    item_option("CLASS", split(class, ",")...)
+    item_option("TYPE", split(type, ",")...)
+    item_option("FREQUENCY", split(freq, ",")...)
+
+    wc_key = Ref{Cint}(-1)
+    @fame_call_check(fame_init_wildcard,
+        (Cint, Ref{Cint}, Cstring, Cint, Cstring),
+        db.key, wc_key, wildcard, 0, C_NULL)
+    ret = FameObject[]
+    try
+        while true
+            name = repeat(" ", 101)
+            cl = Ref{Cint}(-1)
+            ty = Ref{Cint}(-1)
+            fr = Ref{Cint}(-1)
+            fi = Ref{Clonglong}(-1)
+            li = Ref{Clonglong}(-1)
+            status = @fame_call(fame_get_next_wildcard,
+                (Cint, Cstring, Ref{Cint}, Ref{Cint}, Ref{Cint}, Ref{Clonglong}, Ref{Clonglong}, Cint, Ref{Cint}),
+                wc_key.x, name, cl, ty, fr, fi, li, length(name) - 1, C_NULL)
+            if status == HNOOBJ
+                break
+            elseif status == HTRUNC
+                println("Object name too long and truncated $name")
+            else
+                check_status(status)
+            end
+            # FAME pads the string with \0 on the right to the length we gave.
+            name = strip(name, '\0')
+            fo = FameObject(name, cl[], ty[], fr[], fi[], li[])
+            fo.first_period[] = Period{getfreq(fo)}(fi[])
+            fo.last_period[] = Period{getfreq(fo)}(li[])
+            push!(ret, fo)
+            # println(name, " => ", cl[], " ", ty[], " ", fr[], " ", fp[], " ", lp[])
+            # push!(ob, QuickInfo(name, cl[], ty[], fr[], FameIndex(fp[]), FameIndex(lp[])))
+        end
+    finally
+        @fame_call(fame_free_wildcard, (Cint,), wc_key[])
+    end
+    return ret
+end
+
 
 
 # const HNLALL = Int32(-1)

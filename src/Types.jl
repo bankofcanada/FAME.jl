@@ -27,6 +27,8 @@ const access_mode = (;
 throw_wrong_value(::Val{access_mode}, val) = throw_wrong_value("access mode", val)
 check_mode(val) = check_value(val, access_mode)
 
+# Chli and FameDatabase each depends on the other. 
+# We only need AbstractFameDatabase to make that work.
 abstract type AbstractFameDatabase end;
 
 """
@@ -66,14 +68,13 @@ end
 @inline Base.isopen(db::FameDatabase) = db.key >= 0
 @inline Base.isequal(l::FameDatabase, r::FameDatabase) = l.key == r.key
 
-# function Base.show(io::IO, x::FameDatabase)
-#     if x.key >= 0
-#         print(io, "$(x.name): open in $(x.mode) mode")
-#     else
-#         print(io, "$(x.name): closed")
-#     end
-# end
-
+function Base.show(io::IO, x::FameDatabase)
+    if x.key >= 0
+        print(io, "$(x.name): open in $(x.mode) mode")
+    else
+        print(io, "$(x.name): closed")
+    end
+end
 
 const fame_class = (;
     # refer to hli.h for the values
@@ -204,4 +205,8 @@ Integer 64-bit type that represents the internal index FAME uses to access
 elements of series.
 """
 const FameIndex = Int64
+const FameDate = FameIndex
+
+## More types are defined in FameObjects. We need stuff from ChliLibrary.jl in
+## order to define those, so we can't include them here.
 

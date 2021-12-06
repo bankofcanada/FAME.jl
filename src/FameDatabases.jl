@@ -144,66 +144,6 @@ function item_option(name::String, values::AbstractString...)
 end
 
 
-"""
-    listdb(db::FameDatabase, [wc; filters...])
-
-List objects in the database that match the given wildcard and filters.
-
-The wildcard `wc` is a string containing wildcatd characters. 
-'^' matches any one character while '?' matches any zero or more characters.
-
-The filters:
-  * `alias::Bool` - whether or not to match alias names. 
-  * `class::String` - which class of object to match. Multiple classes can be
-    given in a comma-separated string, e.g., `class="SERIES,SCALAR"`.
-  * `type::String` - same as `class` but for the type of the object
-    ("NUMERIC,PRECISION").
-  * `freq::String` - same as `class` but for the frequency of the object.
-
-"""
-function listdb(db::FameDatabase, wildcard::String = "?";
-    alias::Bool = true, class::String = "", type::String = "", freq::String = "")
-
-    @cfm_call_check(cfmsopt, (Cstring, Cstring), "ITEM ALIAS", alias ? "ON" : "OFF")
-    item_option("CLASS", split(class, ",")...)
-    item_option("TYPE", split(type, ",")...)
-    item_option("FREQUENCY", split(freq, ",")...)
-
-    wc_key = Ref{Cint}(-1)
-    @fame_call_check(fame_init_wildcard,
-        (Cint, Ref{Cint}, Cstring, Cint, Cstring),
-        db.key, wc_key, wildcard, 0, C_NULL)
-    # ob = Vector{QuickInfo}()
-    try
-        while true
-            name = repeat(" ", 101)
-            cl = Ref{Cint}(-1)
-            ty = Ref{Cint}(-1)
-            fr = Ref{Cint}(-1)
-            fp = Ref{Clonglong}(-1)
-            lp = Ref{Clonglong}(-1)
-            status = @fame_call(fame_get_next_wildcard,
-                (Cint, Cstring, Ref{Cint}, Ref{Cint}, Ref{Cint}, Ref{Clonglong}, Ref{Clonglong}, Cint, Ref{Cint}),
-                wc_key.x, name, cl, ty, fr, fp, lp, length(name) - 1, C_NULL)
-            if status == HNOOBJ
-                break
-            elseif status == HTRUNC
-                println("Object name too long and truncated $name")
-            else
-                check_status(status)
-            end
-            # FAME pads the string with \0 on the right to the length we gave.
-            name = strip(name, '\0')
-            println(name, " => ", cl[], " ", ty[], " ", fr[], " ", fp[], " ", lp[])
-            # push!(ob, QuickInfo(name, cl[], ty[], fr[], FameIndex(fp[]), FameIndex(lp[])))
-        end
-    finally
-        @fame_call(fame_free_wildcard, (Cint,), wc_key[])
-    end
-    # return ob
-end
-
-
 
 ###
 

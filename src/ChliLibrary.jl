@@ -1,5 +1,6 @@
-
 # __precompile__(false)
+
+# CHLI library: load and bindings
 
 using Libdl
 
@@ -62,18 +63,42 @@ function Chli()
     return ret
 end
 
+
+"""
+    @cfm_global(:cfmXYZ, type)
+
+Fetch the value of a constant by the given name from the CHLI library.
+
+See also: [`@cfm_call_check`](@ref)
+"""
 macro cfm_global(symbol, type)
     sym = :($(@__MODULE__).getsym($(QuoteNode(symbol))))
     call_expr = Expr(:call, :cglobal, sym, type)
     return esc(:(unsafe_load($call_expr)))
 end
 
+"""
+    @fame_call(:fame_XYZ, argTypes, args...)
+
+Build an appropriate ccall to the given fame_XYZ function. 
+
+See also: [`@cfm_call_check`](@ref)
+"""
 macro fame_call(symbol, argTypes, args...)
     sym = :($(@__MODULE__).getsym($(QuoteNode(symbol))))
     call_expr = Expr(:call, :ccall, sym, :Cint, argTypes, args...)
     return esc(:($call_expr))
 end
 
+
+"""
+    @fame_call_check(:fame_XYZ, argTypes, args...)
+
+Build an appropriate ccall to the given fame_XYZ function. This macro also
+checks the status and throws an error if not success.
+
+See also: [`@cfm_call_check`](@ref)
+"""
 macro fame_call_check(symbol, argTypes, args...)
     sym = :($(@__MODULE__).getsym($(QuoteNode(symbol))))
     call_expr = Expr(:call, :ccall, sym, :Cint, argTypes, args...)
