@@ -5,6 +5,7 @@ include("ChliLibrary.jl")
 include("FameDatabases.jl")
 include("FameObjects.jl")
 include("Read.jl")
+include("Write.jl")
 
 export version
 """
