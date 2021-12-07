@@ -48,14 +48,13 @@ function init_chli()
     close_chli()
     global chli = Chli()
 
-    if chli.lib === nothing
-        @warn "FAME not found."
-        return
-    end
+    chli.lib === nothing && return
 
     @cfm_call_check(cfmini)
 
     global FAME_INDEX_NC = @cfm_global(FAME_INDEX_NC, FameIndex)
+    global FAME_INDEX_NA = @cfm_global(FAME_INDEX_NA, FameIndex)
+    global FAME_INDEX_ND = @cfm_global(FAME_INDEX_ND, FameIndex)
 
     global FPRCNA = @cfm_global(FPRCNA, Cdouble)
     global FPRCNC = @cfm_global(FPRCNC, Cdouble)
