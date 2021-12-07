@@ -6,7 +6,7 @@ try    # ============================================
 using LightXML
 
 if !haskey(Base.ENV, "FAME")
-    @error "FAME environment variable is not set!"
+    error("FAME environment variable is not set!")
 end
 
 # The CHLI help file containing the table of codes
