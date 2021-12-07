@@ -40,7 +40,8 @@ end
 
 function Chli()
     if !haskey(Base.ENV, "FAME")
-        error("FAME environment variable is not set!")
+        @error "FAME environment variable is not set! Will not be able to use FAME."
+        return Chli{AbstractFameDatabase}(nothing)
     end
     if Sys.iswindows()
         # we need only the basename of the .dll; Windows automatically 
@@ -63,11 +64,7 @@ function Chli()
     else
         error("Your OS is not supported.")
     end
-    try
-        return Chli{FameDatabase}(Libdl.dlopen(chli_lib_path), FameDatabase[], Ref(FameDatabase(-1)))
-    catch
-        return Chli{AbstractFameDatabase}(nothing)
-    end
+    return Chli{FameDatabase}(Libdl.dlopen(chli_lib_path), FameDatabase[], Ref(FameDatabase(-1)))
 end
 
 
