@@ -1,7 +1,7 @@
 # Copyright (c) 2020-2021, Bank of Canada
 # All rights reserved.
 
-module FAME2
+module FAME
 
 include("Types.jl")
 include("ChliLibrary.jl")
