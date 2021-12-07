@@ -6,7 +6,7 @@ try    # ============================================
 using LightXML
 
 if !haskey(Base.ENV, "FAME")
-    error("FAME environment variable is not set!")
+    @error "FAME environment variable is not set!"
 end
 
 # The CHLI help file containing the table of codes
@@ -44,7 +44,8 @@ open("./FAMEMessages.jl", "w") do f
     println(f)
 end
 
-catch  # ============================================
+catch e # ============================================
+    @error "$(sprint(showerror, e))"
     isfile("./FAMEMessages.jl") && rm("./FAMEMessages.jl")
     # use a stub - these are the status codes we explicitly use in our code.
     open("./FAMEMessages.jl", "w") do f
@@ -60,5 +61,4 @@ catch  # ============================================
         println(f, "global const HBOPT = Int32(67)")
         println(f)
     end
-    rethrow()
 end
