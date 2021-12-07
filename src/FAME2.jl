@@ -2,10 +2,12 @@ module FAME2
 
 include("Types.jl")
 include("ChliLibrary.jl")
-include("FameDatabases.jl")
-include("FameObjects.jl")
+include("Command.jl")
+include("Databases.jl")
+include("Objects.jl")
 include("Read.jl")
 include("Write.jl")
+include("Bridge.jl")
 
 export version
 """
@@ -42,6 +44,12 @@ close it and then load it fresh. See also [`close_chli`](@ref).
 function init_chli()
     close_chli()
     global chli = Chli()
+
+    if chli.lib === nothing
+        @warn "FAME not found."
+        return
+    end
+
     @cfm_call_check(cfmini)
 
     global FAME_INDEX_NC = @cfm_global(FAME_INDEX_NC, FameIndex)

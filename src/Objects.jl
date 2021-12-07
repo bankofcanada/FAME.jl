@@ -40,7 +40,7 @@ end
 """
     FameObject
 
-A structured type the represents a Fame scalar or series.
+A structured type that represents a Fame scalar or series in Julia.
 """
 mutable struct FameObject{CL, FT, FR, DT}
     name::String
@@ -49,12 +49,10 @@ mutable struct FameObject{CL, FT, FR, DT}
     # freq::FR
     first_index::Ref{FameIndex}
     last_index::Ref{FameIndex}
-    first_period::Ref{Period{FR}}
-    last_period::Ref{Period{FR}}
     data::DT
 end
 
-function FameObject(name, cl, ty, fr, fi=-1, li=-1)
+function FameObject(name, cl, ty, fr, fi=-1, li=-1, data=nothing)
     _ty = try
         val_to_symbol(ty, fame_type)
     catch
@@ -66,37 +64,27 @@ function FameObject(name, cl, ty, fr, fi=-1, li=-1)
              _ty == :numeric ? Float32 :
              _ty == :boolean ? Int32 : 
              _ty == :string ? String :
-             _ty == :date ? Int32 :
+             _ty == :date ? FameDate :
              _ty == :namelist ? String : 
              # otherwise _ty is a frequency, so the value is a date
              FameDate
     T = _cl == :series ? Vector{ElType} :
         _cl == :scalar ? Ref{ElType} :
             throw(ArgumentError("Can't handle class $cl."))
-    # return FameObject{_cl, _ty, _fr, T}(name, _cl, _ty, _fr, Period{_fr}(-1), Period{_fr}(-1), T())
-    return FameObject{_cl, _ty, _fr, T}(name, Ref(fi), Ref(li), Ref{Period{_fr}}(), Ref{Period{_fr}}(), T())
+    if data === nothing
+        return FameObject{_cl, _ty, _fr, T}(name, Ref(fi), Ref(li), T())
+    else
+        return FameObject{_cl, _ty, _fr, T}(name, Ref(fi), Ref(li), data)
+    end
 end
 
 function Base.show(io::IO, fo::FameObject{CL, TY, FR,DT}) where {CL,TY,FR,DT}
-    print(io, fo.name, ": ", join((CL, TY, FR, fo.first_period[],fo.last_period[]), ","))
+    print(io, fo.name, ": ", join((CL, TY, FR, 
+        Period{getfreq(fo)}(fo.first_index[]),
+        Period{getfreq(fo)}(fo.last_index[])), ","))
 end
 
 getfreq(::FameObject{CL, FT, FR, DT}) where {CL, FT, FR, DT} = FR
-
-
-
-# """
-#     FameDateYMD
-
-# Structure type that holds information about a date. It includes the year,month
-# and day.
-# """
-# struct FameDateYMD
-#     year::Int32 
-#     month::Int32
-#     day::Int32
-# end
-# Base.show(io::IO, dateYMD::FameDateYMD) = print(io, "$(dateYMD.day)/$(dateYMD.month)/$(dateYMD.year)")
 
 
 export quick_info
@@ -109,10 +97,44 @@ function quick_info(db::FameDatabase, name::String)
     @fame_call_check(fame_quick_info,
         (Cint, Cstring, Ref{Cint}, Ref{Cint}, Ref{Cint}, Ref{Clonglong}, Ref{Clonglong}),
         db.key, name, cl, ty, fr, findex, lindex)
-    fo = FameObject(name, cl[], ty[], fr[], findex[], lindex[])
-    fo.first_period[] = Period{getfreq(fo)}(findex[])
-    fo.last_period[] = Period{getfreq(fo)}(lindex[])
-    return fo
+    return FameObject(name, cl[], ty[], fr[], findex[], lindex[])
+end
+
+
+
+
+### List database
+
+export listdb
+
+"""
+    item_option(name, values...)
+
+Set ITEM option. These are used when matching a wildcard to database objects.
+Option names include "CLASS", "TYPE", "FREQUENCY", "ALIAS".
+
+When the `values` argument is not given, it defaults to "ON". Otherwise `values`
+should be strings and indicate which ITEMs are to be turned on.
+
+"""
+function item_option end
+
+function item_option(name::String, values::AbstractString...)
+    uname = uppercase(strip(name))
+    if isempty(values) || (length(values) == 1 && isempty(strip(values[1])))
+        @cfm_call_check(cfmsopt, (Cstring, Cstring), "ITEM $uname", "ON")
+        return
+    end
+    @cfm_call_check(cfmsopt, (Cstring, Cstring), "ITEM $uname", "OFF")
+    for val in values
+        uval = uppercase(strip(val))
+        try
+            @cfm_call_check(cfmsopt, (Cstring, Cstring), "ITEM $uname $uval", "ON")
+        catch e
+            e isa HLIError && @error "Bad $(uname) $(uval)."
+            rethrow()
+        end
+    end
 end
 
 
@@ -133,6 +155,13 @@ The filters:
   * `freq::String` - same as `class` but for the frequency of the object.
 
 """
+function listdb end
+
+@inline listdb(dbname::AbstractString, args...; kwargs...) = 
+    opendb(dbname) do db
+        listdb(db, args...; kwargs...)
+    end
+    
 function listdb(db::FameDatabase, wildcard::String = "?";
     alias::Bool = true, class="", type="", freq="")
 
@@ -153,14 +182,14 @@ function listdb(db::FameDatabase, wildcard::String = "?";
     try
         while true
             name = repeat(" ", 101)
-            cl = Ref{Cint}(-1)
-            ty = Ref{Cint}(-1)
-            fr = Ref{Cint}(-1)
-            fi = Ref{Clonglong}(-1)
-            li = Ref{Clonglong}(-1)
+            cl = Ref{Cint}()
+            ty = Ref{Cint}()
+            fr = Ref{Cint}()
+            fi = Ref{Clonglong}()
+            li = Ref{Clonglong}()
             status = @fame_call(fame_get_next_wildcard,
                 (Cint, Cstring, Ref{Cint}, Ref{Cint}, Ref{Cint}, Ref{Clonglong}, Ref{Clonglong}, Cint, Ref{Cint}),
-                wc_key.x, name, cl, ty, fr, fi, li, length(name) - 1, C_NULL)
+                wc_key[], name, cl, ty, fr, fi, li, length(name) - 1, C_NULL)
             if status == HNOOBJ
                 break
             elseif status == HTRUNC
@@ -170,19 +199,19 @@ function listdb(db::FameDatabase, wildcard::String = "?";
             end
             # FAME pads the string with \0 on the right to the length we gave.
             name = strip(name, '\0')
+            # note: fame_get_next_wildcard returns incorrect fi and li for scalars.
+            @fame_call_check(fame_quick_info,
+                (Cint, Cstring, Ref{Cint}, Ref{Cint}, Ref{Cint}, Ref{Clonglong}, Ref{Clonglong}),
+                db.key, name, cl, ty, fr, fi, li)
             fo = FameObject(name, cl[], ty[], fr[], fi[], li[])
-            fo.first_period[] = Period{getfreq(fo)}(fi[])
-            fo.last_period[] = Period{getfreq(fo)}(li[])
             push!(ret, fo)
-            # println(name, " => ", cl[], " ", ty[], " ", fr[], " ", fp[], " ", lp[])
-            # push!(ob, QuickInfo(name, cl[], ty[], fr[], FameIndex(fp[]), FameIndex(lp[])))
         end
     finally
         @fame_call(fame_free_wildcard, (Cint,), wc_key[])
     end
     return ret
 end
-
+export listdb
 
 
 # const HNLALL = Int32(-1)
@@ -206,6 +235,4 @@ end
 #     end
 #     return true
 # end
-
-# isnamelist(s::AbstractString) = occursin(',', s) && isfameoname(split(strip(s,['{','}']), ','))
 

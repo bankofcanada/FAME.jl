@@ -77,7 +77,7 @@ function do_write(fo::FameObject{CL,FT}, db::FameDatabase) where {CL,FT}
     do_delete_object(db.key, fo.name)
     do_new_object(db.key, fo)
     range = _get_range(fo)
-    (range isa Ref) && (range[].r_start == FAME_INDEX_NC || range[].r_end == FAME_INDEX_NC) && return
+    (CL == :series) && (range[].r_start == FAME_INDEX_NC || range[].r_end == FAME_INDEX_NC) && return
     unsafe_write(Val(FT), db.key, fo.name, range, fo.data)
 end
 

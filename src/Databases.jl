@@ -109,41 +109,6 @@ function closedb!(db::FameDatabase)
     return db
 end
 
-### List database
-
-export listdb
-
-"""
-    item_option(name, values...)
-
-Set ITEM option. These are used when matching a wildcard to database objects.
-Option names include "CLASS", "TYPE", "FREQUENCY", "ALIAS".
-
-When the `values` argument is not given, it defaults to "ON". Otherwise `values`
-should be strings and indicate which ITEMs are to be turned on.
-
-"""
-function item_option end
-
-function item_option(name::String, values::AbstractString...)
-    uname = uppercase(strip(name))
-    if isempty(values) || (length(values) == 1 && isempty(strip(values[1])))
-        @cfm_call_check(cfmsopt, (Cstring, Cstring), "ITEM $uname", "ON")
-        return
-    end
-    @cfm_call_check(cfmsopt, (Cstring, Cstring), "ITEM $uname", "OFF")
-    for val in values
-        uval = uppercase(strip(val))
-        try
-            @cfm_call_check(cfmsopt, (Cstring, Cstring), "ITEM $uname $uval", "ON")
-        catch e
-            e isa HLIError && @error "Bad $(uname) $(uval)."
-            rethrow()
-        end
-    end
-end
-
-
 
 ###
 

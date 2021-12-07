@@ -18,7 +18,8 @@ struct HLIError <: Exception
     status::Int32
     msg::String
 end
-HLIError(st::Int32) = HLIError(st, get(chli_status_description, st, "Unknown CHLI error."))
+HLIError(st::Int32) = HLIError(st, 
+    st == 513 ? cfmferr() : get(chli_status_description, st, "Unknown CHLI error."))
 Base.showerror(io::IO, e::HLIError) = print(io, "HLI status($(e.status)): $(e.msg)")
 
 
@@ -28,8 +29,8 @@ Base.showerror(io::IO, e::HLIError) = print(io, "HLI status($(e.status)): $(e.ms
 Check the status code returned by cfmXYZ functions. If status indicates success
 we do nothing, otherwise we trigger an HLIError with the error code and message.
 """
-check_status(status::Ref{Int32}) = check_status(status[])
-function check_status(code::Int32)
+@inline check_status(status::Ref{Int32}) = check_status(status[])
+@inline function check_status(code::Int32)
     code == HSUCC && return
     throw(HLIError(code))
 end
@@ -59,8 +60,11 @@ function Chli()
     else
         error("Your OS is not supported.")
     end
-    ret = Chli{FameDatabase}(Libdl.dlopen(chli_lib_path), FameDatabase[], Ref(FameDatabase(-1)))
-    return ret
+    try
+        return Chli{FameDatabase}(Libdl.dlopen(chli_lib_path), FameDatabase[], Ref(FameDatabase(-1)))
+    catch
+        return Chli{AbstractFameDatabase}(nothing)
+    end
 end
 
 
@@ -146,3 +150,8 @@ macro cfm_call_check(symbol, argTypes, args...)
     end |> esc
 end
 
+cfmferr() = (
+    errtxt = repeat(' ', 200);
+    @cfm_call_check(cfmferr, (Cstring,), errtxt);
+    errtxt
+)
