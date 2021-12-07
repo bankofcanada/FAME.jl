@@ -62,9 +62,15 @@ function Chli()
             chli_lib_path = joinpath(Base.ENV["FAME"], "hli", "libchli.so")
         end
     else
-        error("Your OS is not supported.")
+        @error "Your OS is not supported. Will not be able to use FAME."
+        return Chli{AbstractFameDatabase}(nothing)
     end
-    return Chli{FameDatabase}(Libdl.dlopen(chli_lib_path), FameDatabase[], Ref(FameDatabase(-1)))
+    try
+        return Chli{FameDatabase}(Libdl.dlopen(chli_lib_path), FameDatabase[], Ref(FameDatabase(-1)))
+    catch
+        @error "Failed to load CHLI library! Will not be able to use FAME."
+        return Chli{AbstractFameDatabase}(nothing)
+    end
 end
 
 
