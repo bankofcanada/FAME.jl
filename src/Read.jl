@@ -1,3 +1,5 @@
+# Copyright (c) 2020-2021, Bank of Canada
+# All rights reserved.
 
 struct FameRange
     r_freq::Cint
@@ -86,9 +88,6 @@ function do_read!(fo::FameObject{:series,FT,FR},db::FameDatabase) where {FT,FR}
     return
 end
 
-
-
-# FameDate = FameIndex
 
 # const HNMVAL = Int32(0) # Normal value; not missing or magic
 # const HNCVAL = Int32(1) # Missing NC - Not Computable

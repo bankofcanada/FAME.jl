@@ -1,3 +1,5 @@
+# Copyright (c) 2020-2021, Bank of Canada
+# All rights reserved.
 
 
 const _VT = NamedTuple{NAMES, NTuple{N,Int32}} where {NAMES, N}

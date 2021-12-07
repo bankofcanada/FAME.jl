@@ -1,3 +1,5 @@
+# Copyright (c) 2020-2021, Bank of Canada
+# All rights reserved.
 
 
 
@@ -161,7 +163,7 @@ function listdb end
     opendb(dbname) do db
         listdb(db, args...; kwargs...)
     end
-    
+
 function listdb(db::FameDatabase, wildcard::String = "?";
     alias::Bool = true, class="", type="", freq="")
 
@@ -212,27 +214,4 @@ function listdb(db::FameDatabase, wildcard::String = "?";
     return ret
 end
 export listdb
-
-
-# const HNLALL = Int32(-1)
-
-# function isfameoname(s::AbstractString) 
-#     s = strip(s)
-#     if length(s) > 242 || length(s) == 0 return false end
-#     c = first(s)
-#     if !(isletter(c) || c ∈ ('$', '@')) return false end
-#     for c in Iterators.drop(s,1)
-#         # NOTE: Base.isnumeric is different from FAME.isnumeric.
-#         # Since we don't export our isnumeric, we must be explicit when we want to use the one in Base.
-#         if !(isletter(c) || Base.isnumeric(c) || occursin(c, "\$%#@_.")) return false end
-#     end
-#     # TODO: check if s is a FAME reserved word and if so return false
-#     return true
-# end
-# function isfameoname(ss::AbstractArray{S}) where S <: AbstractString
-#     for s in ss 
-#         isfameoname(s) || return false
-#     end
-#     return true
-# end
 

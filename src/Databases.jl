@@ -1,3 +1,5 @@
+# Copyright (c) 2020-2021, Bank of Canada
+# All rights reserved.
 
 
 ### Open Database
@@ -108,24 +110,4 @@ function closedb!(db::FameDatabase)
     db.key = -1
     return db
 end
-
-
-###
-
-# export savedb
-# function savedb(db::FameDatabase,data::Dict)
-#     listnames = collect(keys(data));
-#     for (k,v) in data
-#         if isfameobject(v) 
-#             try
-#                 fame_write(db, v)
-#             catch
-#                 @error "Failed to write $k to database."
-#                 rethrow()
-#             end
-#         else
-#             @warn "Element $(k) is not a FameObject; not written."
-#         end
-#     end
-# end
 

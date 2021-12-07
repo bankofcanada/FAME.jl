@@ -1,3 +1,6 @@
+# Copyright (c) 2020-2021, Bank of Canada
+# All rights reserved.
+
 # __precompile__(false)
 
 # CHLI library: load and bindings

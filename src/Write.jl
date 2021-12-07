@@ -1,3 +1,5 @@
+# Copyright (c) 2020-2021, Bank of Canada
+# All rights reserved.
 
 
 @inline unsafe_write(::Val{:precision}, key, name, range, vals) =

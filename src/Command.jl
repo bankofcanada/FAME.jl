@@ -1,3 +1,5 @@
+# Copyright (c) 2020-2021, Bank of Canada
+# All rights reserved.
 
 
 # The cfmfame command has a limitation that INPUT doesn't work.
