@@ -88,19 +88,26 @@ function _mit_to_date(x::MIT{F}) where {F<:Frequency}
     return (fr, index[])
 end
 
-@inline writefame(dbname::AbstractString, w::Workspace; mode = :overwrite) =
+@inline writefame(dbname::AbstractString, w::Workspace; mode = :overwrite, kwargs...) =
     opendb(dbname, mode) do db
-        writefame(db, w)
+        writefame(db, w; kwargs...)
     end
 
-function writefame(db::FameDatabase, w::Workspace)
+function writefame(db::FameDatabase, w::Workspace; prefix = nothing)
     for (name, value) in w
-        try
-            fo = refame(name, value)
-            do_write(fo, db)
-        catch e
-            @info "Failed to write $(name): $(sprint(showerror, e))" e
-            continue
+        if prefix !== nothing
+            name = Symbol(prefix, "_", name)
+        end
+        if value isa Workspace
+            writefame(db, value; prefix = name)
+        else
+            try
+                fo = refame(name, value)
+                do_write(fo, db)
+            catch e
+                @info "Failed to write $(name): $(sprint(showerror, e))" e
+                continue
+            end
         end
     end
 end
