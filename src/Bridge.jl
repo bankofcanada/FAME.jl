@@ -88,18 +88,19 @@ function _mit_to_date(x::MIT{F}) where {F<:Frequency}
     return (fr, index[])
 end
 
+@inline writefame(db, x::MVTSeries; kwargs...) = writefame(db, Workspace(pairs(x)); kwargs...)
 @inline writefame(dbname::AbstractString, w::Workspace; mode = :overwrite, kwargs...) =
     opendb(dbname, mode) do db
         writefame(db, w; kwargs...)
     end
 
-function writefame(db::FameDatabase, w::Workspace; prefix = nothing)
-    for (name, value) in w
+function writefame(db::FameDatabase, w::Workspace; prefix = nothing, glue::AbstractString = "_")
+    for (name, value) in pairs(w)
         if prefix !== nothing
-            name = Symbol(prefix, "_", name)
+            name = Symbol(prefix, glue, name)
         end
-        if value isa Workspace
-            writefame(db, value; prefix = name)
+        if value isa Union{Workspace,MVTSeries}
+            writefame(db, value; prefix = name, glue=glue)
         else
             try
                 fo = refame(name, value)
