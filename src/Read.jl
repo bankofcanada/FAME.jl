@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2021, Bank of Canada
+# Copyright (c) 2020-2022, Bank of Canada
 # All rights reserved.
 
 struct FameRange
@@ -73,19 +73,19 @@ function do_read!(fo::FameObject{:scalar,FT,FR}, db::FameDatabase) where {FT,FR}
     # number of observations = 0
     # range = CNULL
     unsafe_read!!(Val(FT), db.key, fo.name, C_NULL, fo.data)
-    return
+    return fo
 end
 
 function do_read!(fo::FameObject{:series,FT,FR}, db::FameDatabase) where {FT,FR}
     if fo.first_index[] == FAME_INDEX_NC || fo.last_index[] == FAME_INDEX_NC
         # empty series
         empty!(fo.data)
-        return
+        return fo
     end
     range = Ref(FameRange(val_to_int(FR, fame_freq), fo.first_index[], fo.last_index[]))
     resize!(fo.data, fo.last_index[] - fo.first_index[] + 1)
     unsafe_read!!(Val(FT), db.key, fo.name, range, fo.data)
-    return
+    return fo
 end
 
 

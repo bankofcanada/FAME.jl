@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2021, Bank of Canada
+# Copyright (c) 2020-2022, Bank of Canada
 # All rights reserved.
 
 module FAME
@@ -27,7 +27,9 @@ end
 """
     close_chli()
 
-Finalize FAME and unload the CHLI library.
+Finalize FAME and unload the CHLI library. Normally, it should not be necessary
+to call this function. If you want to restart FAME, e.g., in order to clear the
+work database, call [`init_chli`](@ref).
 """
 function close_chli()
     if chli.lib !== nothing
