@@ -42,26 +42,38 @@ function cfmfame(str::AbstractString)
 end
 
 
+function _fame(cmd)
+    fn = tempname()
+    cfmfame("output file(\"$(fn)!\")")
+    cfmfame(deINPUTcmd(cmd))
+    cfmfame("output terminal")
+    return fn
+end
+
 export fame
-function fame(cmd::AbstractString; quiet::Bool=false)
-     fn = tempname()
-     cfmfame("output file(\"$(fn)!\")")
-     cfmfame(deINPUTcmd(cmd))
-     cfmfame("output terminal")
-     if !quiet
-        foreach(println, readlines(fn))
-     end
-     Base.Filesystem.rm(fn)
-     nothing
+function fame(io::IO, cmd::AbstractString; kwargs...)
+    output = _fame(cmd)
+    foreach(s -> println(io, s), readlines(output))
+    rm(output)
+    return nothing
+end
+
+function fame(cmd::AbstractString; quiet::Bool = false)
+    output = _fame(cmd)
+    if !quiet
+        foreach(println, readlines(output))
+    end
+    Base.Filesystem.rm(output)
+    return nothing
 end
 
 
 export @fame_str
 macro fame_str(cmd, flags...)
     if !isempty(flags) && 'q' ∈ flags[1]
-        return :(fame($cmd; quiet=true))
+        return :(fame($cmd; quiet = true))
     else
-        return :(fame($cmd; quiet=false))
+        return :(fame($cmd; quiet = false))
     end
 end
 

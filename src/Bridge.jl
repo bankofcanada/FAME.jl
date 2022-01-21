@@ -201,17 +201,17 @@ Convert a `FameObject` to a Julia type.
 * DATE SERIES => `TSeries` with element type `MIT`
 * STRING SERIES => `Vector{String}` (the time series metadata is lost)
 """
-@inline unfame(fo::FameObject{:scalar,:precision}) = fo.data[]
-@inline unfame(fo::FameObject{:scalar,:numeric}) = fo.data[]
+@inline unfame(fo::FameObject{:scalar,:precision}) = _unmissing!(fo.data, Val(:precision))[]
+@inline unfame(fo::FameObject{:scalar,:numeric}) = _unmissing!(fo.data, Val(:numeric))[]
 @inline unfame(fo::FameObject{:scalar,:string}) = fo.data[]
 @inline unfame(fo::FameObject{:scalar,:boolean}) = fo.data[] != 0
 @inline unfame(fo::FameObject{:scalar,:namelist}) = fo.data[]
 @inline unfame(fo::FameObject{:scalar,TY}) where {TY} = _date_to_mit(TY, fo.data[])
 
 @inline unfame(fo::FameObject{:series,:precision,FR}) where {FR} =
-    TSeries(_date_to_mit(FR, fo.first_index[]), fo.data)
+    TSeries(_date_to_mit(FR, fo.first_index[]), _unmissing!(fo.data, Val(:precision)))
 @inline unfame(fo::FameObject{:series,:numeric,FR}) where {FR} =
-    TSeries(_date_to_mit(FR, fo.first_index[]), fo.data)
+    TSeries(_date_to_mit(FR, fo.first_index[]), _unmissing!(fo.data, Val(:numeric)))
 @inline unfame(fo::FameObject{:series,:boolean,FR}) where {FR} =
     TSeries(_date_to_mit(FR, fo.first_index[]), [d != 0 for d in fo.data])
 @inline unfame(fo::FameObject{:series,TY,FR}) where {TY,FR} =
@@ -355,11 +355,17 @@ end
 @inline refame(name::Symbol, value::T) where {T<:Real} = refame(name, convert(promote_type(T, Float32), value))
 
 @inline function refame(name::Symbol, value::Float64)
+    if value == typenan(value)
+        value = FAME.FPRCNC
+    end
     return FameObject{:scalar,:precision,:undefined,Ref{Float64}}(
         string(name), Ref(0), Ref(0), Ref(Float64(value)))
 end
 
 @inline function refame(name::Symbol, value::Float32)
+    if value == typenan(value)
+        value = FAME.FNUMNC
+    end
     return FameObject{:scalar,:numeric,:undefined,Ref{Float32}}(
         string(name), Ref(0), Ref(0), Ref(value))
 end
@@ -404,10 +410,10 @@ function refame(name::Symbol, value::TSeries)
     ElType = eltype(value)
     if ElType == Float32
         ty = :numeric
-        val = value.values
+        val = [istypenan(v) ? FNUMNC : v for v in value.values]
     elseif ElType == Float64
         ty = :precision
-        val = value.values
+        val = [istypenan(v) ? FPRCNC : v for v in value.values]
     elseif ElType <: MIT
         ty = _freq_to_fame(frequencyof(ElType))
         val = [_mit_to_date(x)[2] for x in value.values]
@@ -416,13 +422,14 @@ function refame(name::Symbol, value::TSeries)
         val = [Int32(x) for x in value.values]
     else
         ty = :precision
-        val = [Float64(x) for x in value.values]
+        val = map(value.values) do v
+            v = convert(Float64, v)
+            istypenan(v) ? FPRCNC : v
+        end
     end
     return FameObject{:series,ty,fr,typeof(val)}(
         string(name), Ref(find), Ref(lind), val)
 end
-
-
 
 const HNMVAL = Int32(0) # Normal value; not missing or magic
 const HNCVAL = Int32(1) # Missing NC - Not Computable
@@ -458,6 +465,24 @@ function _ismissing(x, ::Val{FR}) where {FR}
     mt = Ref{Int32}(-1)
     @fame_call_check(fame_date_missing_type, (Clonglong, Ref{Cint}), Int64(x), mt)
     return mt[] != HNMVAL
+end
+
+function _unmissing!(x::Ref, v::Val{T}) where {T}
+    nan = typenan(eltype(x))
+    if _ismissing(x[], v)
+        x[] = nan
+    end
+    return x
+end
+
+function _unmissing!(x::Vector, v::Val{T}) where {T}
+    nan = typenan(eltype(x))
+    for i = eachindex(x)
+        if _ismissing(x[i], v)
+            x[i] = nan
+        end
+    end
+    return x
 end
 
 

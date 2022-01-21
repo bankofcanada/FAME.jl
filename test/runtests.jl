@@ -8,12 +8,12 @@ using TimeSeriesEcon
 
 if FAME.chli.lib === nothing
 
-    @info "FAME CHLI library not found"
+    @error "FAME CHLI library not found"
     exit()
 
 end
 
-@testset begin
+@testset "workspaces" begin
     w = Workspace(; a = 1, b = TSeries(2020Q1, randn(10)),
         s = MVTSeries(2020M1, (:q, :p), randn(24, 2)),
         c = Workspace(; alpha = 0.1, beta = 0.8,
@@ -51,5 +51,20 @@ end
     @test issubset(keys(tmp.s), (:p, :q))
 
     rm("data.db")
+end
 
+@testset "missing" begin
+    FAME.init_chli()
+    pr = TSeries(2020Q1, randn(Float64, 8))
+    pr[2020Q4] = NaN
+    nu = TSeries(2020Q1, randn(Float32, 8))
+    nu[2020Q4] = NaN
+    writefame(workdb(), Workspace(; pr, nu))
+    for n in ("pr", "nu")
+        let b = IOBuffer()
+            fame(b, "disp $n")
+            seek(b, 0)
+            @test sum(Base.Fix1(occursin, r"20:4\s+NC"), readlines(b)) == 1
+        end
+    end
 end
