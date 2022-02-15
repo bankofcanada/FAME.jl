@@ -54,7 +54,7 @@ constructed from the FAME names.
 * `glue` is used to join the `prefix`` or the `collect` strings to the rest of
   the name. Use the same value as in `writefame` in order for this to work.
 
-##### Examples
+## Examples
 ```
 julia> w = Workspace(; a = 1, b=TSeries(2020Q1, randn(10)),
        s = MVTSeries(2020M1, (:q, :p), randn(24,2)),
@@ -271,7 +271,7 @@ end
 
 Write Julia data to a FAME database.
 
-##### Arguments:
+## Arguments:
 * `db` can be a string containing the path to a FAME .db file or an instance of `FameDatabase`.
 * `data` is a collection of data which will be written to the database.
   - If `data` is an `MVTSeries`, each series will be written to the database.
@@ -279,7 +279,7 @@ Write Julia data to a FAME database.
     object. In this case any nested `Workspace` of `MVTSeries` objects will be
     written recursively by prepending the names.
 
-##### Options:
+## Options:
 * `mode::Symbol` - if `db` is a string, the database is opened with the
   given `mode`. The default is :overwrite.
 * `prefix::Union{Nothing,String}` - the given `prefix` will be prepended to the
@@ -289,7 +289,7 @@ Write Julia data to a FAME database.
 * `glue::String` - the `glue` is used to join the prefix to the name. The
   default is `"_"`.
 
-##### Examples:
+## Examples:
 ```
 julia> w = Workspace(; a=1, b=TSeries(2020Q1,ones(10)), s=MVTSeries(2020M1, collect("ab"), randn(24,2)))
 Workspace with 2-variables
