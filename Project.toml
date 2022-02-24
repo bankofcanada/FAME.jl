@@ -1,7 +1,7 @@
 name = "FAME"
 uuid = "a2619673-1d62-4ca3-9815-ccab58eb1c5a"
 authors = ["Boyan Bejanov <bbejanov@gmail.com>"]
-version = "0.1.0"
+version = "0.2.0"
 
 [deps]
 Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
@@ -10,7 +10,7 @@ TimeSeriesEcon = "8b6756d2-c55c-11ea-2998-5f67ea17da60"
 
 [compat]
 LightXML = "0.9"
-TimeSeriesEcon = "0.3.1"
+TimeSeriesEcon = "0.4"
 julia = "1.0"
 
 [extras]
