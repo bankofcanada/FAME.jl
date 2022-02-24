@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2021, Bank of Canada
+# Copyright (c) 2020-2022, Bank of Canada
 # All rights reserved.
 
 
@@ -7,25 +7,38 @@
     Period
 
 Structure type that holds information about a period. It includes the frequency
-and the year:period pair.
+(FREQ is a Symbol type parameter) and the year:period pair.
 """
 struct Period{FREQ}
     year::Int32
     period::Int32
 end
-Period{FREQ}(ind::Integer) where {FREQ} = 
-    iscase(FREQ) ? Period{FREQ}(0, convert(Int32, ind)) :
-    # in a scalar freq is undefined and periods are set to 0
-    FREQ == :undefined ? Period{FREQ}(0, 0) :
-    # in an empty series index is set to INDEX_NC and year,period to -1,-1 
-    convert(Int64, ind) == FAME_INDEX_NC ? Period{FREQ}(-1, -1) :
-    # otherwise we call fame to convert index to year:period
-        let y = Ref{Int32}(-1), p = Ref{Int32}(-1)
-            @fame_call_check(fame_index_to_year_period,
-                (Cint, Clonglong, Ref{Cint}, Ref{Cint}),
-                fame_freq[FREQ], convert(Int64, ind), y, p)
-            Period{FREQ}(y[], p[])
-        end
+
+"""
+    Period{FREQ}(index)
+
+Construct a `Period` instance from the given frequency `FREQ` and 
+the given `index`.
+"""
+function Period{FREQ}(ind::Integer) where {FREQ}
+    if iscase(FREQ)
+        return Period{FREQ}(0, convert(Int32, ind))
+    elseif FREQ == :undefined
+        # in a scalar freq is undefined and periods are set to 0
+        return Period{FREQ}(0, 0)
+    elseif convert(Int64, ind) == FAME_INDEX_NC
+        # in an empty series index is set to INDEX_NC and year,period to -1,-1 
+        return Period{FREQ}(-1, -1)
+    else
+        # otherwise we call fame to convert index to year:period
+        y = Ref{Int32}(-1)
+        p = Ref{Int32}(-1)
+        @fame_call_check(fame_index_to_year_period,
+            (Cint, Clonglong, Ref{Cint}, Ref{Cint}),
+            fame_freq[FREQ], convert(Int64, ind), y, p)
+        return Period{FREQ}(y[], p[])
+    end
+end
 Base.show(io::IO, p::Period) = print(io, "$(p.year):$(p.period)")
 
 function FameIndex(p::Period{FREQ})::FameIndex where {FREQ}
@@ -33,7 +46,7 @@ function FameIndex(p::Period{FREQ})::FameIndex where {FREQ}
         return p.period
     else
         date = Ref{Cint}(-1)
-        @fame_call_check(fame_year_period_to_index, (Cint, Ref{Cint}, Cint, Cint), 
+        @fame_call_check(fame_year_period_to_index, (Cint, Ref{Cint}, Cint, Cint),
             fame_freq[FREQ], date, p.year, p.period)
         return date[]
     end
@@ -42,19 +55,23 @@ end
 """
     FameObject
 
-A structured type that represents a Fame scalar or series in Julia.
+A structured type. An instances of FameObject holds the Julia representation of
+a FAME scalar or series.
 """
-mutable struct FameObject{CL, FT, FR, DT}
+mutable struct FameObject{CL,FT,FR,DT}
+    # CL : fame_class
+    # FT : fame_type
+    # FR : fame_freq
+    # DT : type of the `data` field 
     name::String
-    # class::CL
-    # type::FT
-    # freq::FR
     first_index::Ref{FameIndex}
     last_index::Ref{FameIndex}
     data::DT
 end
+export FameObject
 
-function FameObject(name, cl, ty, fr, fi=-1, li=-1, data=nothing)
+function FameObject(name, cl, ty, fr, fi = -1, li = -1, data = nothing)
+    # When the value is a data the type is a frequency.
     _ty = try
         val_to_symbol(ty, fame_type)
     catch
@@ -64,29 +81,29 @@ function FameObject(name, cl, ty, fr, fi=-1, li=-1, data=nothing)
     _fr = val_to_symbol(fr, fame_freq)
     ElType = _ty == :precision ? Float64 :
              _ty == :numeric ? Float32 :
-             _ty == :boolean ? Int32 : 
+             _ty == :boolean ? Int32 :
              _ty == :string ? String :
              _ty == :date ? FameDate :
-             _ty == :namelist ? String : 
+             _ty == :namelist ? String :
              # otherwise _ty is a frequency, so the value is a date
              FameDate
     T = _cl == :series ? Vector{ElType} :
         _cl == :scalar ? Ref{ElType} :
-            throw(ArgumentError("Can't handle class $cl."))
+        throw(ArgumentError("Can't handle class $cl."))
     if data === nothing
-        return FameObject{_cl, _ty, _fr, T}(name, Ref(fi), Ref(li), T())
+        return FameObject{_cl,_ty,_fr,T}(name, Ref(fi), Ref(li), T())
     else
-        return FameObject{_cl, _ty, _fr, T}(name, Ref(fi), Ref(li), data)
+        return FameObject{_cl,_ty,_fr,T}(name, Ref(fi), Ref(li), data)
     end
 end
 
-function Base.show(io::IO, fo::FameObject{CL, TY, FR,DT}) where {CL,TY,FR,DT}
-    print(io, fo.name, ": ", join((CL, TY, FR, 
-        Period{getfreq(fo)}(fo.first_index[]),
-        Period{getfreq(fo)}(fo.last_index[])), ","))
+function Base.show(io::IO, fo::FameObject{CL,TY,FR,DT}) where {CL,TY,FR,DT}
+    print(io, fo.name, ": ", join((CL, TY, FR,
+            Period{getfreq(fo)}(fo.first_index[]),
+            Period{getfreq(fo)}(fo.last_index[])), ","))
 end
 
-getfreq(::FameObject{CL, FT, FR, DT}) where {CL, FT, FR, DT} = FR
+getfreq(::FameObject{CL,FT,FR,DT}) where {CL,FT,FR,DT} = FR
 
 
 export quick_info
@@ -101,8 +118,6 @@ function quick_info(db::FameDatabase, name::String)
         db.key, name, cl, ty, fr, findex, lindex)
     return FameObject(name, cl[], ty[], fr[], findex[], lindex[])
 end
-
-
 
 
 ### List database
@@ -159,13 +174,13 @@ The filters:
 """
 function listdb end
 
-@inline listdb(dbname::AbstractString, args...; kwargs...) = 
+@inline listdb(dbname::AbstractString, args...; kwargs...) =
     opendb(dbname) do db
         listdb(db, args...; kwargs...)
     end
 
 function listdb(db::FameDatabase, wildcard::String = "?";
-    alias::Bool = true, class="", type="", freq="")
+    alias::Bool = true, class = "", type = "", freq = "")
 
     class = string(class)
     type = string(type)

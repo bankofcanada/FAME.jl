@@ -21,7 +21,7 @@ struct HLIError <: Exception
     status::Int32
     msg::String
 end
-HLIError(st::Int32) = HLIError(st, 
+HLIError(st::Int32) = HLIError(st,
     st == 513 ? cfmferr() : get(chli_status_description, st, "Unknown CHLI error."))
 Base.showerror(io::IO, e::HLIError) = print(io, "HLI status($(e.status)): $(e.msg)")
 
@@ -43,12 +43,12 @@ function Chli()
         @error "FAME environment variable is not set! Will not be able to use FAME."
         return Chli{AbstractFameDatabase}(nothing)
     end
-    if Sys.iswindows()
+    @static if Sys.iswindows()
         # we need only the basename of the .dll; Windows automatically 
         # decorates it with extension and finds it on the PATH
         chli_lib_path = "chli"
         # ensure  chli.dll file is on the PATH so Windows can find it
-        if Sys.ARCH == :x86_64
+        @static if Sys.ARCH == :x86_64
             Base.ENV["PATH"] *= ";" * Base.ENV["FAME"] * "\\64"
         else
             Base.ENV["PATH"] *= ";" * Base.ENV["FAME"]
@@ -56,7 +56,7 @@ function Chli()
     elseif Sys.islinux()
         # in Linux libchli.so is located in a subdirectory hli
         # we need to specify the full path to the .so file 
-        if Sys.ARCH == :x86_64
+        @static if Sys.ARCH == :x86_64
             chli_lib_path = joinpath(Base.ENV["FAME"], "hli", "64", "libchli.so")
         else
             chli_lib_path = joinpath(Base.ENV["FAME"], "hli", "libchli.so")
