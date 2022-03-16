@@ -15,7 +15,7 @@ Read data from FAME database into Julia. The data is returned in a
 [`Workspace`](@ref).
 
 `db` is a `FameDatabase` or a `String`. If `db` is a `String`, the database will
-be opened in `:readonly` mode an closed after loading the data.
+be opened in `:readonly` mode and closed after loading the data.
 
 If `db` is the only argument, then all objects in the database will be loaded.
 Arguments and options can be used to restrict which objects will be loaded.
@@ -23,11 +23,12 @@ Arguments and options can be used to restrict which objects will be loaded.
 Each positional argument after the first one should be a string or a Symbol. 
 * If it is a string that contains a wildcard character (`'?'` or `'^'`, see Fame
   help about wildcards) then we call [`listdb`](@ref) to obtain a list of
-  objects matching the given wildcard. In this case `wc_options...` we pass to
-  `listdb` - you can use them to limit to specific class, type, frequency, etc.
-  See [`listdb`](@ref) for details.
-* Otherwise, an object with the given name will be loaded. `wc_options` are
-  ignored, meaning that the object will be loaded no matter its class, 
+  objects matching the given wildcard. In this case, we pass the given
+  `wc_options...` to `listdb`. You can use them to limit the wildcard search to
+  specific class, type, frequency, etc. See [`listdb`](@ref) for details.
+* Otherwise (Symbol or a string not containing wildcard caracters), an object
+  with the given name will be loaded. `wc_options...` are ignored, meaning that
+  the object will be loaded no matter its class, type, frequency, etc.
 
 The following options can be used to modify how the Julia identifiers are
 constructed from the FAME names.
@@ -37,22 +38,24 @@ constructed from the FAME names.
   pass any function that takes a string and returns a string as the value of the
   `namecase` option. The default is `lowercase`. For example, this may be a good
   idea if your database contains names with symbols that are not allowed in
-  Julia identifiers. Currently we just call `Symbol(namecase(fo.name))`, but you
+  Julia identifiers. Currently, we just call `Symbol(namecase(fo.name))`, but you
   may want to substitute such symbols for something else, e.g.
   `namecase=(x->lowercase(replace(x, "@"=>"_")))`.
-* `prefix` if given will be stripped (together with `glue`) from the beginning
+* `prefix`, if given, will be stripped (together with `glue`) from the beginning
   of the FAME name. If the name does not begin with the given `prefix` then it
   will remain unchanged. If you want to load only names starting with the given
-  prefix you must make sure to use the appropriate wildcard. Defaul is
-  `prefix=nothing`, which disables this functionality.
-* `collect` is a string/Symbol or a `Vector` whose elements are strings/symbols
-  or Vectors of strings, etc. If the name begins with one of the given `collect`
-  values (together with the `glue`), then the object will be loaded in a nested
-  Workspace. The idea is that nested Workspaces written to the database would be
-  loaded in the same structure by providing the list of names of the nested
-  Workspaces in the `collect` option value.
-* `glue` is used to join the `prefix`` or the `collect` strings to the rest of
-  the name. Use the same value as in `writefame` in order for this to work.
+  prefix you must make sure to use the appropriate wildcard. Default is
+  `prefix=nothing`, which disables this functionality. Note that
+  `prefix=nothing` and `prefix=""` are not the same.
+* `collect` can be a string/Symbol, a `Vector` whose elements are
+  strings/symbols or Vectors of strings/symbols, etc. If the name begins with
+  one of the given `collect` values (together with the `glue`), then the object
+  will be loaded in a nested Workspace. The idea is that nested Workspaces
+  written to the database would be loaded in the same structure by providing the
+  list of names of the nested Workspaces in the `collect` option value.
+* `glue` is used to join the `prefix` or the `collect` strings to the rest of
+  the name. Use the same value as in [`writefame`](@ref) in order for this to
+  work.
 
 ## Examples
 ```
@@ -77,12 +80,14 @@ julia> writefame("data.db", w); listdb("data.db")
  S_P: series,precision,monthly,2020:1,2021:12
  S_Q: series,precision,monthly,2020:1,2021:12
 
-julia> readfame("data.db", "a", "b")  # read only variables in the list
+julia> # read only variables in the list
+julia> readfame("data.db", "a", "b")
 Workspace with 2-variables
   a ⇒ 1.0
   b ⇒ 10-element TSeries{Quarterly} with range 2020Q1:2022Q2
 
-julia> readfame("data.db")   # read everything as it is in the database
+julia> # read everything as it is in the database
+julia> readfame("data.db")
 Workspace with 7-variables
         a ⇒ 1.0
         b ⇒ 10-element TSeries{Quarterly} with range 2020Q1:2022Q2
@@ -92,7 +97,8 @@ Workspace with 7-variables
       s_p ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
       s_q ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
 
-julia> readfame("data.db", prefix="c")  # prefix is stripped where it appears (still loading everything)
+julia> # prefix is stripped where it appears (still loading everything)
+julia> readfame("data.db", prefix="c")
 Workspace with 7-variables
       a ⇒ 1.0
       b ⇒ 10-element TSeries{Quarterly} with range 2020Q1:2022Q2
@@ -102,21 +108,25 @@ Workspace with 7-variables
     s_p ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
     s_q ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
 
-julia> readfame("data.db", "s?")    # wildcard
+julia> # wildcard search, no prefix (name remains unchanged)
+julia> readfame("data.db", "s?")
 Workspace with 2-variables
   s_p ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
   s_q ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
 
-julia> readfame("data.db", "s?", prefix="s")  # prefix with matching wildcard
+julia> # prefix (stripped) with matching wildcard search
+julia> readfame("data.db", "s?", prefix="s")  
 Workspace with 2-variables
   p ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
   q ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
 
-julia> readfame("data.db", "c?", collect="c")   # collect with matching wildcard
+julia> # collect with matching wildcard
+julia> readfame("data.db", "c?", collect="c")   
 Workspace with 1-variables
   c ⇒ Workspace with 3-variables
 
-julia> readfame("data.db", collect=["c"=>["n"], "s"])  # nested collect - matches the original structure
+julia> # nested collect - matches the original structure of nested Workspaces
+julia> readfame("data.db", collect=["c"=>["n"], "s"])  
 Workspace with 4-variables
   a ⇒ 1.0
   b ⇒ 10-element TSeries{Quarterly} with range 2020Q1:2022Q2
@@ -196,7 +206,7 @@ Convert a `FameObject` to a Julia type.
 * DATE SCALAR => `MIT` (CASE becomes `MIT{Unit}`, Frequencies not supported by
   TimeSeriesEcon throw an `ErrorException`)
 * PRECISION SERIES => `TSeries` 
-* NUMERCI SERIES => `TSeries` with element type `Float32`
+* NUMERIC SERIES => `TSeries` with element type `Float32`
 * BOOLEAN SERIES => `TSeries` with element type `Bool`
 * DATE SERIES => `TSeries` with element type `MIT`
 * STRING SERIES => `Vector{String}` (the time series metadata is lost)
@@ -272,7 +282,8 @@ end
 Write Julia data to a FAME database.
 
 ## Arguments:
-* `db` can be a string containing the path to a FAME .db file or an instance of `FameDatabase`.
+* `db` can be a string containing the path to a FAME .db file or an instance of
+  `FameDatabase`.
 * `data` is a collection of data which will be written to the database.
   - If `data` is an `MVTSeries`, each series will be written to the database.
   - If `data` is a `Workspace`, each element will be written as a separate FAME
