@@ -16,7 +16,7 @@ export version
 """
     version()
 
-Return the version of FAME in use.
+Return the version of FAME in use. 
 """
 function version()
     version = Ref{Cfloat}(0.0)

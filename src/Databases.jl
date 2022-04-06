@@ -51,8 +51,9 @@ remote connection in the following format.
 
     "[<tcp_port>@]<host> [<username> [<password>] ] <db>"
 
-`mode` can be an integer code (consult the CHLI help), a string or an
-[`AccessMode`](@ref).
+`mode` can be an integer (consult the CHLI help), or a `Symbol`. Valid modes
+include `:readonly`, `:create`, `:overwrite`, `:update`, `:shared`, `:write`,
+`:direct_write`.
 """
 function opendb end
 export opendb
@@ -63,10 +64,8 @@ function cfmopdb(dbname::String, mode::Int32)
     return dbkey[]
 end
 
-@inline opendb(dbname::String, mode=:readonly) = (
+opendb(dbname::String, mode=:readonly) = 
     FameDatabase(cfmopdb(dbname, val_to_int(mode, access_mode)), dbname, mode)
-) 
-
 
 function opendb(F::Function, args...)
     db = opendb(args...)
@@ -83,16 +82,16 @@ export postdb
 """
     postdb(db::FameDatabase)
 
-Post database. If you've made any updates to the database you must post it
-before closing. Othewise all your changes will be lost.
+Post the given FAME database. If you've made any updates to the database you
+must post it before closing, otherwise all your changes will be lost.
 """
-@inline postdb(db::FameDatabase) = @cfm_call_check(cfmpodb, (Cint,), db.key)
+postdb(db::FameDatabase) = @cfm_call_check(cfmpodb, (Cint,), db.key)
 
 ### Close database
 
 export closedb!
 
-@inline cfmcldb(dbkey::Int32) = @cfm_call_check(cfmcldb, (Cint,), dbkey)
+cfmcldb(dbkey::Int32) = @cfm_call_check(cfmcldb, (Cint,), dbkey)
 
 """
     closedb!(db::FameDatabase)

@@ -12,10 +12,10 @@ using TimeSeriesEcon
         wc_options...)
 
 Read data from FAME database into Julia. The data is returned in a
-[`Workspace`](@ref).
+[`Workspace`](@ref TimeSeriesEcon.Workspace).
 
-`db` is a `FameDatabase` or a `String`. If `db` is a `String`, the database will
-be opened in `:readonly` mode and closed after loading the data.
+`db` is a [`FameDatabase`](@ref) or a `String`. If `db` is a `String`, the
+database will be opened in `:readonly` mode and closed after loading the data.
 
 If `db` is the only argument, then all objects in the database will be loaded.
 Arguments and options can be used to restrict which objects will be loaded.
@@ -24,9 +24,10 @@ Each positional argument after the first one should be a string or a Symbol.
 * If it is a string that contains a wildcard character (`'?'` or `'^'`, see Fame
   help about wildcards) then we call [`listdb`](@ref) to obtain a list of
   objects matching the given wildcard. In this case, we pass the given
-  `wc_options...` to `listdb`. You can use them to limit the wildcard search to
-  specific class, type, frequency, etc. See [`listdb`](@ref) for details.
-* Otherwise (Symbol or a string not containing wildcard caracters), an object
+  `wc_options...` to [`listdb`](@ref). You can use them to limit the wildcard
+  search to specific class, type, frequency, etc. See [`listdb`](@ref) for
+  details.
+* Otherwise (Symbol or a string not containing wildcard characters), an object
   with the given name will be loaded. `wc_options...` are ignored, meaning that
   the object will be loaded no matter its class, type, frequency, etc.
 
@@ -44,15 +45,16 @@ constructed from the FAME names.
 * `prefix`, if given, will be stripped (together with `glue`) from the beginning
   of the FAME name. If the name does not begin with the given `prefix` then it
   will remain unchanged. If you want to load only names starting with the given
-  prefix you must make sure to use the appropriate wildcard. Default is
-  `prefix=nothing`, which disables this functionality. Note that
-  `prefix=nothing` and `prefix=""` are not the same.
-* `collect` can be a string/Symbol, a `Vector` whose elements are
-  strings/symbols or Vectors of strings/symbols, etc. If the name begins with
-  one of the given `collect` values (together with the `glue`), then the object
-  will be loaded in a nested Workspace. The idea is that nested Workspaces
-  written to the database would be loaded in the same structure by providing the
-  list of names of the nested Workspaces in the `collect` option value.
+  prefix you must use the appropriate wildcard. Default is `prefix=nothing`,
+  which disables this functionality. Note that `prefix=nothing` and `prefix=""`
+  are not the same.
+* `collect` can be a string/symbol, a vector whose elements are strings/symbols
+  or vectors of strings/symbols, etc. If the name begins with one of the given
+  `collect` values (together with the `glue`), then the object will be loaded in
+  a nested [`Workspace`](@ref). The idea is that nested Workspaces written to
+  the database would be loaded in the same structure by providing the list of
+  names of the nested Workspaces in the `collect` option value. See the examples
+  below.
 * `glue` is used to join the `prefix` or the `collect` strings to the rest of
   the name. Use the same value as in [`writefame`](@ref) in order for this to
   work.
@@ -154,8 +156,8 @@ end
     opendb(dbname) do db
         readfame(db, args...; kwargs...)
     end
-
-@inline readfame(db::FameDatabase; kwargs...) = readfame(db, "?"; kwargs...)
+# if list of names is not given
+readfame(db::FameDatabase; kwargs...) = readfame(db, "?"; kwargs...)
 # The other cases
 function readfame(db::FameDatabase, args...; namecase = lowercase, prefix = nothing, collect = [], glue = "_", kwargs...)
     if collect isa Union{AbstractString,Symbol,Pair{<:Union{AbstractString,Symbol},<:Any}}
@@ -172,15 +174,15 @@ function readfame(db::FameDatabase, args...; namecase = lowercase, prefix = noth
     return ret
 end
 
-@inline _iswildcard(wc) = occursin('?', wc) || occursin('^', wc)
+_iswildcard(wc) = occursin('?', wc) || occursin('^', wc)
 
-@inline _remove_prefix(name, pref) = startswith(name, pref) ? replace(name, pref => ""; count = 1) : name
+_remove_prefix(name, pref) = startswith(name, pref) ? replace(name, pref => ""; count = 1) : name
 # Handle the prefix argument
-@inline _destination(ret, name, glue, prefix::AbstractString, args...) = _destination(ret, _remove_prefix(name, uppercase(string(prefix) * glue)), glue, nothing, args...)
+_destination(ret, name, glue, prefix::AbstractString, args...) = _destination(ret, _remove_prefix(name, uppercase(string(prefix) * glue)), glue, nothing, args...)
 # Recursion on the collect arguments
-@inline _destination(ret, name, glue, ::Nothing) = (ret, name)
-@inline _destination(ret, name, glue, ::Nothing, W::Any, args...) = error("Invalid type of W: $(typeof(W))")
-@inline _destination(ret, name, glue, ::Nothing, W::Union{Symbol,AbstractString}, args...) = _destination(ret, name, glue, nothing, W => [], args...)
+_destination(ret, name, glue, ::Nothing) = (ret, name)
+_destination(ret, name, glue, ::Nothing, W::Any, args...) = error("Invalid type of W: $(typeof(W))")
+_destination(ret, name, glue, ::Nothing, W::Union{Symbol,AbstractString}, args...) = _destination(ret, name, glue, nothing, W => [], args...)
 @inline function _destination(ret, name, glue, ::Nothing, (Wpref, Wargs)::Pair{<:Union{Symbol,AbstractString},<:Any}, args...)
     pref = uppercase(string(Wpref) * glue)
     if startswith(name, pref)
@@ -189,7 +191,6 @@ end
         return _destination(ret, name, glue, nothing, args...)
     end
 end
-
 
 
 
@@ -202,31 +203,38 @@ Convert a `FameObject` to a Julia type.
 * NUMERIC SCALAR => `Float32`
 * STRING SCALAR => `String`
 * BOOLEAN SCALAR => `Bool`
-* NAMELIST => `String` (Formatted as "{NAME1,NAME2,ETC}", see Fame help for details.)
-* DATE SCALAR => `MIT` (CASE becomes `MIT{Unit}`, Frequencies not supported by
-  TimeSeriesEcon throw an `ErrorException`)
-* PRECISION SERIES => `TSeries` 
-* NUMERIC SERIES => `TSeries` with element type `Float32`
-* BOOLEAN SERIES => `TSeries` with element type `Bool`
-* DATE SERIES => `TSeries` with element type `MIT`
-* STRING SERIES => `Vector{String}` (the time series metadata is lost)
+* NAMELIST => `String` (Formatted as "{NAME1,NAME2,ETC}", see Fame help for
+  details.)
+* DATE SCALAR => [`MIT`](@ref TimeSeriesEcon.MIT) (CASE becomes `MIT{Unit}`,
+  Frequencies not supported by TimeSeriesEcon throw an `ErrorException`)
+* PRECISION SERIES => [`TSeries`](@ref TimeSeriesEcon.TSeries)
+* NUMERIC SERIES => [`TSeries`](@ref TimeSeriesEcon.TSeries) with element type
+  `Float32`
+* BOOLEAN SERIES => [`TSeries`](@ref TimeSeriesEcon.TSeries) with element type
+  `Bool`
+* DATE SERIES => [`TSeries`](@ref TimeSeriesEcon.TSeries) with element type
+  [`MIT`](@ref TimeSeriesEcon.MIT)
+* STRING SERIES => `Vector{String}` (the time series metadata is lost) 
 """
-@inline unfame(fo::FameObject{:scalar,:precision}) = _unmissing!(fo.data, Val(:precision))[]
-@inline unfame(fo::FameObject{:scalar,:numeric}) = _unmissing!(fo.data, Val(:numeric))[]
-@inline unfame(fo::FameObject{:scalar,:string}) = fo.data[]
-@inline unfame(fo::FameObject{:scalar,:boolean}) = fo.data[] != 0
-@inline unfame(fo::FameObject{:scalar,:namelist}) = fo.data[]
-@inline unfame(fo::FameObject{:scalar,TY}) where {TY} = _date_to_mit(TY, fo.data[])
+function unfame end
+export unfame
 
-@inline unfame(fo::FameObject{:series,:precision,FR}) where {FR} =
+unfame(fo::FameObject{:scalar,:precision}) = _unmissing!(fo.data, Val(:precision))[]
+unfame(fo::FameObject{:scalar,:numeric}) = _unmissing!(fo.data, Val(:numeric))[]
+unfame(fo::FameObject{:scalar,:string}) = fo.data[]
+unfame(fo::FameObject{:scalar,:boolean}) = fo.data[] != 0
+unfame(fo::FameObject{:scalar,:namelist}) = fo.data[]
+unfame(fo::FameObject{:scalar,TY}) where {TY} = _date_to_mit(TY, fo.data[])
+
+unfame(fo::FameObject{:series,:precision,FR}) where {FR} =
     TSeries(_date_to_mit(FR, fo.first_index[]), _unmissing!(fo.data, Val(:precision)))
-@inline unfame(fo::FameObject{:series,:numeric,FR}) where {FR} =
+unfame(fo::FameObject{:series,:numeric,FR}) where {FR} =
     TSeries(_date_to_mit(FR, fo.first_index[]), _unmissing!(fo.data, Val(:numeric)))
-@inline unfame(fo::FameObject{:series,:boolean,FR}) where {FR} =
+unfame(fo::FameObject{:series,:boolean,FR}) where {FR} =
     TSeries(_date_to_mit(FR, fo.first_index[]), [d != 0 for d in fo.data])
-@inline unfame(fo::FameObject{:series,TY,FR}) where {TY,FR} =
+unfame(fo::FameObject{:series,TY,FR}) where {TY,FR} =
     TSeries(_date_to_mit(FR, fo.first_index[]), [_date_to_mit(TY, d) for d in fo.data])
-@inline unfame(fo::FameObject{:series,:string,FR}) where {FR} =
+unfame(fo::FameObject{:series,:string,FR}) where {FR} =
     copy(fo.data) # error("Can't handle string series")
 
 @inline _freq_from_fame(fr) =
@@ -281,16 +289,16 @@ end
 
 Write Julia data to a FAME database.
 
-## Arguments:
+### Arguments:
 * `db` can be a string containing the path to a FAME .db file or an instance of
-  `FameDatabase`.
+  [`FameDatabase`](@ref).
 * `data` is a collection of data which will be written to the database.
   - If `data` is an `MVTSeries`, each series will be written to the database.
   - If `data` is a `Workspace`, each element will be written as a separate FAME
     object. In this case any nested `Workspace` of `MVTSeries` objects will be
     written recursively by prepending the names.
 
-## Options:
+### Options:
 * `mode::Symbol` - if `db` is a string, the database is opened with the
   given `mode`. The default is :overwrite.
 * `prefix::Union{Nothing,String}` - the given `prefix` will be prepended to the
@@ -300,7 +308,7 @@ Write Julia data to a FAME database.
 * `glue::String` - the `glue` is used to join the prefix to the name. The
   default is `"_"`.
 
-## Examples:
+### Examples:
 ```
 julia> w = Workspace(; a=1, b=TSeries(2020Q1,ones(10)), s=MVTSeries(2020M1, collect("ab"), randn(24,2)))
 Workspace with 2-variables
@@ -355,13 +363,30 @@ const _FameWritable = Union{MVTSeries,Workspace}
 #     _writefame(db, pairs(data), prefix, glue)
 
 # write a list of MVTSeries and Workspace
-@inline writefame(db::FameDatabase, data::_FameWritable...; kwargs...) = writefame(db, data; kwargs...)
+writefame(db::FameDatabase, data::_FameWritable...; kwargs...) = writefame(db, data; kwargs...)
 @inline function writefame(db::FameDatabase, data::Tuple{_FameWritable,Vararg{_FameWritable}}; prefix = nothing, glue = "_")
     for d in data
         _writefame(db, pairs(d), prefix, glue)
     end
 end
 
+"""
+    refame(name, value)
+
+Convert the given value to a [`FameObject`](@ref)
+
+* `Real` => NUMERIC SCALAR (includes integers)
+* `Float64` => PRECISION SCALAR
+* `Bool` => BOOLEAN SCALAR
+* [`MIT`](@ref TimeSeriesEcon.MIT) => DATE SCALAR
+* `String` => NAMELIST, if it is in the form "{name1,name2,...}", otherwise
+  STRING SCALAR
+* `Vector{String}` => CASE SERIES of STRING
+* [`TSeries`](@ref TimeSeriesEcon.TSeries) => a SERIES of the same frequency and
+  type. The type conversions are the same as for scalars.
+"""
+function refame end
+export refame
 
 @inline refame(name::Symbol, value::T) where {T<:Real} = refame(name, convert(promote_type(T, Float32), value))
 

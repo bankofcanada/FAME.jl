@@ -1,6 +1,12 @@
 # Copyright (c) 2020-2022, Bank of Canada
 # All rights reserved.
 
+"""
+    struct FameRange … end
+
+Range includes a frequency code and two endpoints start and end. This is a type
+used by the CHLI library.
+"""
 struct FameRange
     r_freq::Cint
     r_start::Clonglong
@@ -8,6 +14,8 @@ struct FameRange
 end
 FameRange() = FameRange(0, 0, 0)
 # Base.length(r::FameRange) = (-1 ∈ (r.r_end, r.r_start)) ? 0 : Int64(r.r_end)-Int64(r.r_start)+1
+
+
 
 @inline unsafe_read!!(::Val{:precision}, key, name, range, vals) =
     (@fame_call_check(fame_get_precisions,
@@ -69,23 +77,35 @@ function unsafe_read!!(::Val{:namelist}, key, name, range, vals)
     return vals
 end
 
-function do_read!(fo::FameObject{:scalar,FT,FR}, db::FameDatabase) where {FT,FR}
+"""
+    do_read!(obj::FameObject, db::FameDatabase)
+
+Read data for the given [`FameObject`](@ref) from the given
+[`FameDatabase`](@ref). `obj` is modified in place and returned.
+
+A [`FameObject`](@ref) can be created directly, or it could be
+returned by [`quick_info`](@ref) or [`listdb`](@ref).
+"""
+function do_read! end
+export do_read!
+
+function do_read!(obj::FameObject{:scalar,FT,FR}, db::FameDatabase) where {FT,FR}
     # number of observations = 0
     # range = CNULL
-    unsafe_read!!(Val(FT), db.key, fo.name, C_NULL, fo.data)
-    return fo
+    unsafe_read!!(Val(FT), db.key, obj.name, C_NULL, obj.data)
+    return obj
 end
 
-function do_read!(fo::FameObject{:series,FT,FR}, db::FameDatabase) where {FT,FR}
-    if fo.first_index[] == FAME_INDEX_NC || fo.last_index[] == FAME_INDEX_NC
+function do_read!(obj::FameObject{:series,FT,FR}, db::FameDatabase) where {FT,FR}
+    if obj.first_index[] == FAME_INDEX_NC || obj.last_index[] == FAME_INDEX_NC
         # empty series
-        empty!(fo.data)
-        return fo
+        empty!(obj.data)
+        return obj
     end
-    range = Ref(FameRange(val_to_int(FR, fame_freq), fo.first_index[], fo.last_index[]))
-    resize!(fo.data, fo.last_index[] - fo.first_index[] + 1)
-    unsafe_read!!(Val(FT), db.key, fo.name, range, fo.data)
-    return fo
+    range = Ref(FameRange(val_to_int(FR, fame_freq), obj.first_index[], obj.last_index[]))
+    resize!(obj.data, obj.last_index[] - obj.first_index[] + 1)
+    unsafe_read!!(Val(FT), db.key, obj.name, range, obj.data)
+    return obj
 end
 
 

@@ -4,22 +4,15 @@
 
 
 """
-    Period
+    struct Period{FREQ} … end
 
-Structure type that holds information about a period. It includes the frequency
-(FREQ is a Symbol type parameter) and the year:period pair.
+A FAME period includes the frequency, year and period. 
 """
 struct Period{FREQ}
     year::Int32
     period::Int32
 end
 
-"""
-    Period{FREQ}(index)
-
-Construct a `Period` instance from the given frequency `FREQ` and 
-the given `index`.
-"""
 function Period{FREQ}(ind::Integer) where {FREQ}
     if iscase(FREQ)
         return Period{FREQ}(0, convert(Int32, ind))
@@ -53,10 +46,19 @@ function FameIndex(p::Period{FREQ})::FameIndex where {FREQ}
 end
 
 """
-    FameObject
+    mutable struct FameObject{CL,FT,FR,DT} … end
 
-A structured type. An instances of FameObject holds the Julia representation of
-a FAME scalar or series.
+FAME object of class `CL`, type `FT`, frequency `FR` and data type `DT`.
+
+A `FameObject` is returned by [`quick_info`](@ref) and a vector of
+`FameObject`s is returned by [`listdb`](@ref). 
+
+Also, a `FameObject` can be constructed directly by calling
+`FameObject(name, class, type, frequency)` or
+`FameObject(name, class, type, frequency, first_index, last_index)`. The values
+of `class`, `type`, and `frequency` can be symbols (like, `:scalar`,
+`:precision`, etc.) or integers. Refer to the FAME CHLI documentation for the
+code values.
 """
 mutable struct FameObject{CL,FT,FR,DT}
     # CL : fame_class
@@ -71,7 +73,7 @@ end
 export FameObject
 
 function FameObject(name, cl, ty, fr, fi = -1, li = -1, data = nothing)
-    # When the value is a data the type is a frequency.
+    # When the value is a date the type is a frequency.
     _ty = try
         val_to_symbol(ty, fame_type)
     catch
@@ -107,6 +109,14 @@ getfreq(::FameObject{CL,FT,FR,DT}) where {CL,FT,FR,DT} = FR
 
 
 export quick_info
+"""
+    quick_info(db, name)
+
+Get information about object named `name` in the given database. The information
+inlcudes its class, type, frequency, and range. Return a [`FameObject`](@ref) in
+which all these attributes are set correctly, but the data does not contain the
+correct values.
+"""
 function quick_info(db::FameDatabase, name::String)
     cl = Ref{Cint}(-1)
     ty = Ref{Cint}(-1)
@@ -158,19 +168,19 @@ end
 """
     listdb(db::FameDatabase, [wc; filters...])
 
-List objects in the database that match the given wildcard and filters.
+List objects in the database that match the given wildcard and filters. Return a
+[`Vector{FameObject}`](@ref FameObject).
 
-The wildcard `wc` is a string containing wildcatd characters. 
-'^' matches any one character while '?' matches any zero or more characters.
+The wildcard `wc` is a string containing wildcard characters. '^' matches any
+one character, while '?' matches any zero or more characters. If not given, the 
+default is '?' which would list the entire database.
 
 The filters:
   * `alias::Bool` - whether or not to match alias names. 
   * `class::String` - which class of object to match. Multiple classes can be
     given in a comma-separated string, e.g., `class="SERIES,SCALAR"`.
-  * `type::String` - same as `class` but for the type of the object
-    ("NUMERIC,PRECISION").
-  * `freq::String` - same as `class` but for the frequency of the object.
-
+  * `type::String` - which type of object to match, e.g., `type="NUMERIC,PRECISION"`.
+  * `freq::String` - which frequency of object to match, e.g., `freq="QUARTERLY"`.
 """
 function listdb end
 
