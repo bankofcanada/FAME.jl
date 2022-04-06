@@ -17,6 +17,11 @@ catch
     @error "Try re-building FAME"
 end
 
+"""
+    struct HLIError <: Exception … end
+
+Exception type for errors returned by CHLI calls.
+"""
 struct HLIError <: Exception
     status::Int32
     msg::String
@@ -30,9 +35,10 @@ Base.showerror(io::IO, e::HLIError) = print(io, "HLI status($(e.status)): $(e.ms
     check_status(status)
 
 Check the status code returned by cfmXYZ functions. If status indicates success
-we do nothing, otherwise we trigger an HLIError with the error code and message.
+we do nothing, otherwise we trigger an HLIError with the error code and the
+message.
 """
-@inline check_status(status::Ref{Int32}) = check_status(status[])
+check_status(status::Ref{Int32}) = check_status(status[])
 @inline function check_status(code::Int32)
     code == HSUCC && return
     throw(HLIError(code))

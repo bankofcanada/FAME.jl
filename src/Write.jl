@@ -2,17 +2,17 @@
 # All rights reserved.
 
 
-@inline unsafe_write(::Val{:precision}, key, name, range, vals) =
+unsafe_write(::Val{:precision}, key, name, range, vals) =
     @fame_call_check(fame_write_precisions,
         (Cint, Cstring, Ptr{FameRange}, Ref{Float64}),
         key, name, range, vals)
 
-@inline unsafe_write(::Val{:numeric}, key, name, range, vals) =
+unsafe_write(::Val{:numeric}, key, name, range, vals) =
     @fame_call_check(fame_write_numerics,
         (Cint, Cstring, Ptr{FameRange}, Ref{Float32}),
         key, name, range, vals)
 
-@inline unsafe_write(::Val{:boolean}, key, name, range, vals) =
+unsafe_write(::Val{:boolean}, key, name, range, vals) =
     @fame_call_check(fame_write_booleans,
         (Cint, Cstring, Ptr{FameRange}, Ref{Int32}),
         key, name, range, vals)
@@ -71,15 +71,25 @@ end
         fame_observed[eltype(fo.data) <: AbstractFloat ? :summed : :undefined])
 end
 
-@inline _get_range(::FameObject{:scalar}) = C_NULL
-@inline _get_range(fo::FameObject{:series,TY,FR}) where {TY,FR} =
+_get_range(::FameObject{:scalar}) = C_NULL
+_get_range(fo::FameObject{:series,TY,FR}) where {TY,FR} =
     Ref(FameRange(val_to_int(FR, fame_freq), fo.first_index[], fo.last_index[]))
 
-function do_write(fo::FameObject{CL,FT}, db::FameDatabase) where {CL,FT}
-    do_delete_object(db.key, fo.name)
-    do_new_object(db.key, fo)
-    range = _get_range(fo)
+"""
+    do_write(obj::FameObject, db::FameDatabase)
+
+Write the given [`FameObject`](@ref) to the given [`FameDatabase`](@ref). If an
+object by the same name already exists, it is deleted before the new object is
+written.
+"""
+function do_write end
+export do_write
+
+function do_write(obj::FameObject{CL,FT}, db::FameDatabase) where {CL,FT}
+    do_delete_object(db.key, obj.name)
+    do_new_object(db.key, obj)
+    range = _get_range(obj)
     (CL == :series) && (range[].r_start == FAME_INDEX_NC || range[].r_end == FAME_INDEX_NC) && return
-    unsafe_write(Val(FT), db.key, fo.name, range, fo.data)
+    unsafe_write(Val(FT), db.key, obj.name, range, obj.data)
 end
 

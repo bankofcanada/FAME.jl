@@ -50,7 +50,16 @@ function _fame(cmd)
     return fn
 end
 
+"""
+    fame(io, command::String)
+    fame(command::String; quiet=false)
+
+Run the FAME command `command` and write the output to `io` or the screen. If `io`
+is not specified the output can be suppressed with `quiet=true`.
+"""
+function fame end
 export fame
+
 function fame(io::IO, cmd::AbstractString; kwargs...)
     output = _fame(cmd)
     foreach(s -> println(io, s), readlines(output))
@@ -67,8 +76,16 @@ function fame(cmd::AbstractString; quiet::Bool = false)
     return nothing
 end
 
+"""
+    fame"command"
+    fame"command"q
 
+Run the the FAME command and write the output to the screen, or suppress the
+output if the `q` flag is present.
+"""
+macro fame_str end
 export @fame_str
+
 macro fame_str(cmd, flags...)
     if !isempty(flags) && 'q' ∈ flags[1]
         return :(fame($cmd; quiet = true))
