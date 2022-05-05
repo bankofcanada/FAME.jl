@@ -7,7 +7,7 @@ using TimeSeriesEcon
 """
     readfame(db, args...; 
         namecase=lowercase,
-        prefix=nothing, glue="_",
+        prefix=nothing, glue="@",
         collect=[], 
         wc_options...)
 
@@ -76,11 +76,11 @@ julia> writefame("data.db", w); listdb("data.db")
 7-element Vector{FameObject}:
  A: scalar,numeric,undefined,0:0,0:0
  B: series,precision,quarterly_december,2020:1,2022:2
- C_ALPHA: scalar,precision,undefined,0:0,0:0
- C_BETA: scalar,precision,undefined,0:0,0:0
- C_N_S: scalar,string,undefined,0:0,0:0
- S_P: series,precision,monthly,2020:1,2021:12
- S_Q: series,precision,monthly,2020:1,2021:12
+ C@ALPHA: scalar,precision,undefined,0:0,0:0
+ C@BETA: scalar,precision,undefined,0:0,0:0
+ C@N@S: scalar,string,undefined,0:0,0:0
+ S@P: series,precision,monthly,2020:1,2021:12
+ S@Q: series,precision,monthly,2020:1,2021:12
 
 julia> # read only variables in the list
 julia> readfame("data.db", "a", "b")
@@ -93,11 +93,11 @@ julia> readfame("data.db")
 Workspace with 7-variables
         a ⇒ 1.0
         b ⇒ 10-element TSeries{Quarterly} with range 2020Q1:2022Q2
-  c_alpha ⇒ 0.1
-   c_beta ⇒ 0.8
-    c_n_s ⇒ 11-codeunit String
-      s_p ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
-      s_q ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
+  c@alpha ⇒ 0.1
+   c@beta ⇒ 0.8
+    c@n@s ⇒ 11-codeunit String
+      s@p ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
+      s@q ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
 
 julia> # prefix is stripped where it appears (still loading everything)
 julia> readfame("data.db", prefix="c")
@@ -106,15 +106,15 @@ Workspace with 7-variables
       b ⇒ 10-element TSeries{Quarterly} with range 2020Q1:2022Q2
   alpha ⇒ 0.1
    beta ⇒ 0.8
-    n_s ⇒ 11-codeunit String
-    s_p ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
-    s_q ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
+    n@s ⇒ 11-codeunit String
+    s@p ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
+    s@q ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
 
 julia> # wildcard search, no prefix (name remains unchanged)
 julia> readfame("data.db", "s?")
 Workspace with 2-variables
-  s_p ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
-  s_q ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
+  s@p ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
+  s@q ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
 
 julia> # prefix (stripped) with matching wildcard search
 julia> readfame("data.db", "s?", prefix="s")  
@@ -159,7 +159,7 @@ end
 # if list of names is not given
 readfame(db::FameDatabase; kwargs...) = readfame(db, "?"; kwargs...)
 # The other cases
-function readfame(db::FameDatabase, args...; namecase = lowercase, prefix = nothing, collect = [], glue = "_", kwargs...)
+function readfame(db::FameDatabase, args...; namecase=lowercase, prefix=nothing, collect=[], glue="@", kwargs...)
     if collect isa Union{AbstractString,Symbol,Pair{<:Union{AbstractString,Symbol},<:Any}}
         collect = [collect]
     end
@@ -167,28 +167,51 @@ function readfame(db::FameDatabase, args...; namecase = lowercase, prefix = noth
     for wc in args
         fos = _iswildcard(wc) ? listdb(db, wc; kwargs...) : [quick_info(db, wc)]
         for fo in fos
-            dest, name = _destination(ret, fo.name, glue, prefix, collect...)
+            dest, name = _destination(ret, fo.name, glue, namecase, prefix, collect...)
             _readfame!(dest, Symbol(namecase(name)), fo, db)
         end
     end
     return ret
+    ### experimental (write metadata for mvtseries, so we can load them as mvtseries)
+    # return _ws_to_mvts(ret)
 end
+
+### experimental (write metadata for mvtseries, so we can load them as mvtseries)
+# _ws_to_mvts(any) = any
+# function _ws_to_mvts(w::Workspace)
+#     names = get(w, :mvtseries_colnames, nothing)
+#     if names === nothing
+#         for (k,v) in w
+#             w[k] = _ws_to_mvts(v)
+#         end
+#         return w
+#     end
+#     names = Symbol.(split(names, ','))
+#     return MVTSeries(rangeof(w[names]); pairs(w[names])...)
+# end
 
 _iswildcard(wc) = occursin('?', wc) || occursin('^', wc)
 
-_remove_prefix(name, pref) = startswith(name, pref) ? replace(name, pref => ""; count = 1) : name
+_remove_prefix(name, pref) = startswith(name, pref) ? replace(name, pref => ""; count=1) : name
 # Handle the prefix argument
-_destination(ret, name, glue, prefix::AbstractString, args...) = _destination(ret, _remove_prefix(name, uppercase(string(prefix) * glue)), glue, nothing, args...)
+_destination(ret, name, glue, namecase, prefix::AbstractString, args...) = _destination(ret, _remove_prefix(name, uppercase(string(prefix) * glue)), glue, namecase, nothing, args...)
 # Recursion on the collect arguments
-_destination(ret, name, glue, ::Nothing) = (ret, name)
-_destination(ret, name, glue, ::Nothing, W::Any, args...) = error("Invalid type of W: $(typeof(W))")
-_destination(ret, name, glue, ::Nothing, W::Union{Symbol,AbstractString}, args...) = _destination(ret, name, glue, nothing, W => [], args...)
-@inline function _destination(ret, name, glue, ::Nothing, (Wpref, Wargs)::Pair{<:Union{Symbol,AbstractString},<:Any}, args...)
+_destination(ret, name, glue, namecase, ::Nothing) = (ret, name)
+_destination(ret, name, glue, namecase, ::Nothing, W::Any, args...) = error("Invalid type of W: $(typeof(W))")
+_destination(ret, name, glue, namecase, ::Nothing, W::Union{Symbol,AbstractString}, args...) = _destination(ret, name, glue, namecase, nothing, W => [], args...)
+@inline function _destination(ret, name, glue, namecase, ::Nothing, (Wpref, Collect)::Pair{<:Union{Symbol,AbstractString},<:Any}, args...)
+    parts = split(name, glue)
+    if length(parts) > 1 && (Wpref == "?" || Wpref == "*")
+        Wpref = namecase(parts[1])
+    end
     pref = uppercase(string(Wpref) * glue)
     if startswith(name, pref)
-        return _destination(get!(ret, Symbol(Wpref), Workspace()), replace(name, pref => ""; count = 1), glue, nothing, Wargs...)
+        if Collect isa Union{Symbol,AbstractString}
+            Collect = [Collect]
+        end
+        return _destination(get!(ret, Symbol(Wpref), Workspace()), join(parts[2:end], glue), glue, namecase, nothing, Collect...)
     else
-        return _destination(ret, name, glue, nothing, args...)
+        return _destination(ret, name, glue, namecase, nothing, args...)
     end
 end
 
@@ -306,7 +329,7 @@ Write Julia data to a FAME database.
   nothing will be prepended. NOTE: `prefix=nothing` and `prefix=""` are not the
   same.
 * `glue::String` - the `glue` is used to join the prefix to the name. The
-  default is `"_"`.
+  default is `"@"`.
 
 ### Examples:
 ```
@@ -322,8 +345,8 @@ julia> listdb("w.db")
 2-element Vector{FAME.FameObject}:
  A: scalar,precision,undefined,0:0,0:0
  B: series,precision,quarterly_december,2020:1,2022:2
- S_A: series,precision,monthly,2020:1,2021:12
- S_B: series,precision,monthly,2020:1,2021:12
+ S@A: series,precision,monthly,2020:1,2021:12
+ S@B: series,precision,monthly,2020:1,2021:12
 
 ```
 """
@@ -336,22 +359,35 @@ function _writefame(db, iterable, prefix, glue)
         if prefix !== nothing
             name = Symbol(prefix, glue, name)
         end
-        if value isa Union{Workspace,MVTSeries}
-            _writefame(db, pairs(value), name, glue) #= glue= =#
-        else
-            try
-                fo = refame(name, value)
-                do_write(fo, db)
-            catch e
-                @info "Failed to write $(name): $(sprint(showerror, e))" e
-                continue
-            end
-        end
+        _writefame_one(db, value, name, glue)
     end
 end
 
+function _writefame_one(db, value::Workspace, name, glue)
+    _writefame(db, pairs(value), name, glue)
+    return
+end
+
+function _writefame_one(db, value::MVTSeries, name, glue)
+    _writefame(db, pairs(value), name, glue)
+    ### experimental (write metadata for mvtseries, so we can load them as mvtseries)
+    # nms = join(colnames(value), ",")
+    # _writefame(db, [(:mvtseries_colnames => nms),], name, glue)
+    return
+end
+
+function _writefame_one(db, value, name, glue)
+    try
+        fo = refame(name, value)
+        do_write(fo, db)
+    catch e
+        @info "Failed to write $(name): $(sprint(showerror, e))" e
+    end
+    return
+end
+
 # If database is given as a string
-@inline writefame(dbname::AbstractString, data...; mode = :overwrite, kwargs...) =
+@inline writefame(dbname::AbstractString, data...; mode=:overwrite, kwargs...) =
     opendb(dbname, mode) do db
         writefame(db, data...; kwargs...)
     end
@@ -359,14 +395,14 @@ end
 const _FameWritable = Union{MVTSeries,Workspace}
 
 # # write a single Workspace or MVTSeries
-# @inline writefame(db::FameDatabase, data::_FameWritable; prefix=nothing, glue="_") = 
+# @inline writefame(db::FameDatabase, data::_FameWritable; prefix=nothing, glue="@") = 
 #     _writefame(db, pairs(data), prefix, glue)
 
 # write a list of MVTSeries and Workspace
 writefame(db::FameDatabase, data::_FameWritable...; kwargs...) = writefame(db, data; kwargs...)
-@inline function writefame(db::FameDatabase, data::Tuple{_FameWritable,Vararg{_FameWritable}}; prefix = nothing, glue = "_")
-    for d in data
-        _writefame(db, pairs(d), prefix, glue)
+@inline function writefame(db::FameDatabase, data::Tuple{_FameWritable,Vararg{_FameWritable}}; prefix=nothing, glue="@")
+    for value in data
+        _writefame_one(db, value, prefix, glue)
     end
 end
 
