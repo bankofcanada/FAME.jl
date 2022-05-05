@@ -7,7 +7,7 @@ using TimeSeriesEcon
 """
     readfame(db, args...; 
         namecase=lowercase,
-        prefix=nothing, glue="@",
+        prefix=nothing, glue="_",
         collect=[], 
         wc_options...)
 
@@ -76,11 +76,11 @@ julia> writefame("data.db", w); listdb("data.db")
 7-element Vector{FameObject}:
  A: scalar,numeric,undefined,0:0,0:0
  B: series,precision,quarterly_december,2020:1,2022:2
- C@ALPHA: scalar,precision,undefined,0:0,0:0
- C@BETA: scalar,precision,undefined,0:0,0:0
- C@N@S: scalar,string,undefined,0:0,0:0
- S@P: series,precision,monthly,2020:1,2021:12
- S@Q: series,precision,monthly,2020:1,2021:12
+ C_ALPHA: scalar,precision,undefined,0:0,0:0
+ C_BETA: scalar,precision,undefined,0:0,0:0
+ C_N_S: scalar,string,undefined,0:0,0:0
+ S_P: series,precision,monthly,2020:1,2021:12
+ S_Q: series,precision,monthly,2020:1,2021:12
 
 julia> # read only variables in the list
 julia> readfame("data.db", "a", "b")
@@ -93,11 +93,11 @@ julia> readfame("data.db")
 Workspace with 7-variables
         a ⇒ 1.0
         b ⇒ 10-element TSeries{Quarterly} with range 2020Q1:2022Q2
-  c@alpha ⇒ 0.1
-   c@beta ⇒ 0.8
-    c@n@s ⇒ 11-codeunit String
-      s@p ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
-      s@q ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
+  c_alpha ⇒ 0.1
+   c_beta ⇒ 0.8
+    c_n_s ⇒ 11-codeunit String
+      s_p ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
+      s_q ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
 
 julia> # prefix is stripped where it appears (still loading everything)
 julia> readfame("data.db", prefix="c")
@@ -106,15 +106,15 @@ Workspace with 7-variables
       b ⇒ 10-element TSeries{Quarterly} with range 2020Q1:2022Q2
   alpha ⇒ 0.1
    beta ⇒ 0.8
-    n@s ⇒ 11-codeunit String
-    s@p ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
-    s@q ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
+    n_s ⇒ 11-codeunit String
+    s_p ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
+    s_q ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
 
 julia> # wildcard search, no prefix (name remains unchanged)
 julia> readfame("data.db", "s?")
 Workspace with 2-variables
-  s@p ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
-  s@q ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
+  s_p ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
+  s_q ⇒ 24-element TSeries{Monthly} with range 2020M1:2021M12
 
 julia> # prefix (stripped) with matching wildcard search
 julia> readfame("data.db", "s?", prefix="s")  
@@ -159,7 +159,7 @@ end
 # if list of names is not given
 readfame(db::FameDatabase; kwargs...) = readfame(db, "?"; kwargs...)
 # The other cases
-function readfame(db::FameDatabase, args...; namecase=lowercase, prefix=nothing, collect=[], glue="@", kwargs...)
+function readfame(db::FameDatabase, args...; namecase=lowercase, prefix=nothing, collect=[], glue="_", kwargs...)
     if collect isa Union{AbstractString,Symbol,Pair{<:Union{AbstractString,Symbol},<:Any}}
         collect = [collect]
     end
@@ -329,7 +329,7 @@ Write Julia data to a FAME database.
   nothing will be prepended. NOTE: `prefix=nothing` and `prefix=""` are not the
   same.
 * `glue::String` - the `glue` is used to join the prefix to the name. The
-  default is `"@"`.
+  default is `"_"`.
 
 ### Examples:
 ```
@@ -345,8 +345,8 @@ julia> listdb("w.db")
 2-element Vector{FAME.FameObject}:
  A: scalar,precision,undefined,0:0,0:0
  B: series,precision,quarterly_december,2020:1,2022:2
- S@A: series,precision,monthly,2020:1,2021:12
- S@B: series,precision,monthly,2020:1,2021:12
+ S_A: series,precision,monthly,2020:1,2021:12
+ S_B: series,precision,monthly,2020:1,2021:12
 
 ```
 """
@@ -395,12 +395,12 @@ end
 const _FameWritable = Union{MVTSeries,Workspace}
 
 # # write a single Workspace or MVTSeries
-# @inline writefame(db::FameDatabase, data::_FameWritable; prefix=nothing, glue="@") = 
+# @inline writefame(db::FameDatabase, data::_FameWritable; prefix=nothing, glue="_") = 
 #     _writefame(db, pairs(data), prefix, glue)
 
 # write a list of MVTSeries and Workspace
 writefame(db::FameDatabase, data::_FameWritable...; kwargs...) = writefame(db, data; kwargs...)
-@inline function writefame(db::FameDatabase, data::Tuple{_FameWritable,Vararg{_FameWritable}}; prefix=nothing, glue="@")
+@inline function writefame(db::FameDatabase, data::Tuple{_FameWritable,Vararg{_FameWritable}}; prefix=nothing, glue="_")
     for value in data
         _writefame_one(db, value, prefix, glue)
     end
