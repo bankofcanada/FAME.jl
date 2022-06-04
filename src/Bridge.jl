@@ -482,16 +482,16 @@ function refame(name::Symbol, value::TSeries)
     ElType = eltype(value)
     if ElType == Float32
         ty = :numeric
-        val = [istypenan(v) ? FNUMNC : v for v in value.values]
+        val = Float32[istypenan(v) ? FNUMNC : v for v in value.values]
     elseif ElType == Float64
         ty = :precision
-        val = [istypenan(v) ? FPRCNC : v for v in value.values]
+        val = Float64[istypenan(v) ? FPRCNC : v for v in value.values]
     elseif ElType <: MIT
         ty = _freq_to_fame(frequencyof(ElType))
-        val = [_mit_to_date(x)[2] for x in value.values]
+        val = FameIndex[_mit_to_date(x)[2] for x in value.values]
     elseif ElType == Bool
         ty = :boolean
-        val = [Int32(x) for x in value.values]
+        val = Int32[x for x in value.values]
     else
         ty = :precision
         val = map(value.values) do v
