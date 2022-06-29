@@ -12,7 +12,7 @@ using Libdl
 export check_status
 
 try
-    include("../deps/FAMEMessages.jl")
+    include(joinpath(@__DIR__, "..", "deps", "FAMEMessages.jl"))
 catch
     @error "Try re-building FAME"
 end

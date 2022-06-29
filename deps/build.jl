@@ -25,7 +25,7 @@ find_table(el::XMLElement) = name(el) == "table" ? el : find_table( collect(chil
 # main loop
 open("./FAMEMessages.jl", "w") do f
     println(f, "\n# This file is autogenerted.  Do not edit.")
-    println(f, "\n\nchli_help_file = \"", help_file, "\"")
+    println(f, "\n\nchli_help_file = \"", escape_string(help_file), "\"")
     # Read and parse the help file
     xdoc = parse_file(help_file)
     table = find_table(root(xdoc))
