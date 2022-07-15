@@ -152,7 +152,7 @@ function _readfame!(ret, ident, fo, db)
 end
 
 # If db is given as a string
-@inline readfame(dbname::AbstractString, args...; kwargs...) =
+@inline readfame(dbname, args...; kwargs...) =
     opendb(dbname) do db
         readfame(db, args...; kwargs...)
     end
