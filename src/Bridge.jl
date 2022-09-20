@@ -237,13 +237,63 @@ unfame(fo::FameObject{:series,TY,FR}) where {TY,FR} =
 unfame(fo::FameObject{:series,:string,FR}) where {FR} =
     copy(fo.data) # error("Can't handle string series")
 
+from_fame_quarterly_map = Dict(
+    :january    => Quarterly{1},
+    :february   => Quarterly{2},
+    :march      => Quarterly,
+    :april      => Quarterly{1},
+    :may        => Quarterly{2},
+    :june       => Quarterly,
+    :july       => Quarterly{1},
+    :august     => Quarterly{2},
+    :september  => Quarterly,
+    :october    => Quarterly{1},
+    :november   => Quarterly{2},
+    :december   => Quarterly
+)
+
+from_fame_yearly_map = Dict(
+    :january    => Yearly{1},
+    :february   => Yearly{2},
+    :march      => Yearly{3},
+    :april      => Yearly{4},
+    :may        => Yearly{5},
+    :june       => Yearly{6},
+    :july       => Yearly{7},
+    :august     => Yearly{8},
+    :september  => Yearly{9},
+    :october    => Yearly{10},
+    :november   => Yearly{11},
+    :december   => Yearly
+)
+
+from_fame_weekly_map = Dict(
+    :monday     => Weekly{1},
+    :tuesday    => Weekly{2},
+    :wednesday  => Weekly{3},
+    :thursday   => Weekly{4},
+    :friday     => Weekly{5},
+    :saturday   => Weekly{6},
+    :sunday     => Weekly{7},
+)
+
+from_fame_frequencies_map = Dict(
+    :quarterly  => from_fame_quarterly_map,
+    :monthly    => Monthly,
+    :annual     => from_fame_yearly_map,
+    :case       => Unit,
+    :daily      => Daily,
+    :business   => BusinessDaily,
+    :weekly     => from_fame_weekly_map
+)
+
 @inline _freq_from_fame(fr) =
     (
         fr = string(val_to_symbol(fr, fame_freq));
-        startswith(fr, "quarterly") ? Quarterly :
-        startswith(fr, "monthly") ? Monthly :
-        startswith(fr, "annual") ? Yearly :
-        startswith(fr, "case") ? Unit :
+        fr_split = Symbol.(split(fr, "_"));
+        # could maybe use more error checking
+        fr_split[1] ∈ keys(from_fame_frequencies_map) && from_fame_frequencies_map[fr_split[1]] isa Dict ? from_fame_frequencies_map[fr_split[1]][fr_split[2]] :
+        fr_split[1] ∈ keys(from_fame_frequencies_map) ? from_fame_frequencies_map[fr_split[1]] :
         error("Cannot convert FAME frequency $fr to TimeSeriesEcon.")
     )
 
@@ -261,13 +311,68 @@ function _date_to_mit(fr, date)
     return MIT{F}(y[], p[])
 end
 
+
+
+to_fame_quarterly_map = Dict{Integer, Symbol}(
+    1 => :quarterly_october,
+    2 => :quarterly_november,
+    3 => :quarterly_december
+)
+to_fame_yearly_map = Dict{Integer, Symbol}(
+    1   => :annual_january,
+    2   => :annual_february,
+    3   => :annual_march,
+    4   => :annual_april,
+    5   => :annual_may,
+    6   => :annual_june,
+    7   => :annual_july,
+    8   => :annual_august,
+    9   => :annual_september,
+    10  => :annual_october,
+    11  => :annual_november,
+    12  => :annual_december,
+)
+to_fame_weekly_map = Dict{Integer, Symbol}(
+    1   => :weekly_monday,
+    2   => :weekly_tuesday,
+    3   => :weekly_wednesday,
+    4   => :weekly_thursday,
+    5   => :weekly_friday,
+    6   => :weekly_saturday,
+    7   => :weekly_sunday,
+)
+to_fame_frequencies_map = Dict{Type, Symbol}(
+    Unit            => :case,
+    Yearly          => :annual_december,
+    Quarterly       => :quarterly_december,
+    Monthly         => :monthly,
+    Weekly          => :weekly_sunday,
+    Daily           => :daily,
+    BusinessDaily   => :business,
+)
+
+function _freq_to_fame(F::Type{<:Quarterly{N}})  where N
+    if N ∈ keys(to_fame_quarterly_map)
+        return to_fame_quarterly_map[N]
+    end
+    return error("Cannot convert TimeSeriesEcon frequency $F to a FAME frequency.");
+end
+function _freq_to_fame(F::Type{<:Yearly{N}})  where N
+    if N ∈ keys(to_fame_yearly_map)
+        return to_fame_yearly_map[N]
+    end
+    return error("Cannot convert TimeSeriesEcon frequency $F to a FAME frequency.");
+end
+function _freq_to_fame(F::Type{<:Weekly{N}})  where N
+    if N ∈ keys(to_fame_weekly_map)
+        return to_fame_weekly_map[N]
+    end
+    return error("Cannot convert TimeSeriesEcon frequency $F to a FAME frequency.");
+end
 @inline _freq_to_fame(F) =
     (
-        F == Unit ? :case :
-        F == Quarterly ? :quarterly_december :
-        F == Monthly ? :monthly :
-        F == Yearly ? :annual_december :
-        error("Cannot convert TimeSeriesEcon frequency $F to a FAME frequency.")
+        F ∈ keys(to_fame_frequencies_map) && return to_fame_frequencies_map[F];
+        return error("Cannot convert TimeSeriesEcon frequency $F to a FAME frequency.");
     )
 
 function _mit_to_date(x::MIT{F}) where {F<:Frequency}
