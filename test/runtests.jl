@@ -68,3 +68,66 @@ end
         end
     end
 end
+
+@testset "writing and reading all frequencies" begin
+    frequencies = [
+        Daily,
+        BusinessDaily,
+        Weekly,
+        Weekly{1},
+        Weekly{2},
+        Weekly{3},
+        Weekly{4},
+        Weekly{5},
+        Weekly{6},
+        # Weekly{7}
+        Monthly,
+        Quarterly,
+        Quarterly{1},
+        Quarterly{2},
+        # Quarterly{3},
+        Yearly,
+        Yearly{1},
+        Yearly{2},
+        Yearly{3},
+        Yearly{4},
+        Yearly{5},
+        Yearly{6},
+        Yearly{7},
+        Yearly{8},
+        Yearly{9},
+        Yearly{10},
+        Yearly{11},
+        # Yearly{12}
+    ]
+    counter = 1
+    db_write = Workspace()
+    for F in frequencies
+        t2 = nothing
+        if F == Daily
+            t = TSeries(daily("2022-01-03"), collect(1:800))
+        elseif F <: CalendarFrequency 
+            t = TSeries(fconvert(F, daily("2000-06-01")), collect(1:200))
+            t2 = TSeries(fconvert(F, daily("1975-01-01")), collect(1:200))
+        elseif F <: Yearly
+            t = TSeries(MIT{F}(2000), collect(1:40))
+        elseif F <: Monthly
+            t = TSeries(MIT{F}(2000*12), collect(1:40))
+        elseif F <: Quarterly
+            t = TSeries(MIT{F}(2000*4), collect(1:40))
+        end
+
+        db_write[Symbol("t$(counter)")] = t
+        db_write[Symbol("mit$(counter)")] = t.firstdate
+        counter += 1
+        if t2 !== nothing
+            db_write[Symbol("t$(counter)_early")] = t2
+            db_write[Symbol("mitt$(counter)_early")] = t2.firstdate
+        end
+    end
+    writefame("db_write.db", db_write)
+    db_read = readfame(joinpath(pwd(), "db_write.db"));
+    @test compare(db_write, db_read) == true
+
+    rm("db_write.db")
+end
