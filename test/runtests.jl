@@ -69,6 +69,7 @@ end
     end
 end
 
+frequency_to_name(F::Type) = lowercase(replace(replace(String(Symbol(F)), "{" => ""), "}" => ""))
 @testset "writing and reading all frequencies" begin
     frequencies = [
         Daily,
@@ -103,27 +104,28 @@ end
     counter = 1
     db_write = Workspace()
     for F in frequencies
-        t2 = nothing
-        if F == Daily
-            t = TSeries(daily("2022-01-03"), collect(1:800))
-        elseif F <: CalendarFrequency 
-            t = TSeries(fconvert(F, daily("2000-06-01")), collect(1:200))
-            t2 = TSeries(fconvert(F, daily("1975-01-01")), collect(1:200))
-        elseif F <: Yearly
-            t = TSeries(MIT{F}(2000), collect(1:40))
-        elseif F <: Monthly
-            t = TSeries(MIT{F}(2000*12), collect(1:40))
-        elseif F <: Quarterly
-            t = TSeries(MIT{F}(2000*4), collect(1:40))
+        subcounter = 1
+        for i in 1:500
+            year = rand(collect(1970:2030))
+            month = rand(collect(1:12))
+            day = rand(collect(1:28))
+            if F == Daily
+                t = TSeries(daily("$year-$month-$day"), collect(1:800))
+            elseif F <: CalendarFrequency 
+                t = TSeries(fconvert(F, daily("$year-$month-$day")), collect(1:200))
+            elseif F <: Yearly
+                t = TSeries(MIT{F}(year), collect(1:40))
+            elseif F <: Monthly
+                t = TSeries(MIT{F}(year*12 + month), collect(1:40))
+            elseif F <: Quarterly
+                t = TSeries(MIT{F}(year*4 + month), collect(1:40))
+            end
+    
+            db_write[Symbol("t_$(frequency_to_name(F))_$subcounter")] = t
+            db_write[Symbol("mit_$(frequency_to_name(F))_$subcounter")] = t.firstdate
+            subcounter += 1
         end
-
-        db_write[Symbol("t$(counter)")] = t
-        db_write[Symbol("mit$(counter)")] = t.firstdate
-        counter += 1
-        if t2 !== nothing
-            db_write[Symbol("t$(counter)_early")] = t2
-            db_write[Symbol("mitt$(counter)_early")] = t2.firstdate
-        end
+        counter += 1       
     end
     writefame("db_write.db", db_write)
     db_read = readfame(joinpath(pwd(), "db_write.db"));
