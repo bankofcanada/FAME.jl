@@ -17,6 +17,9 @@ Read data from FAME database into Julia. The data is returned in a
 `db` is a [`FameDatabase`](@ref) or a `String`. If `db` is a `String`, the
 database will be opened in `:readonly` mode and closed after loading the data.
 
+If the db string containing a path to a file, the path should be encapsulated in 
+escaped double quotes whenever the path contains spaces.
+
 If `db` is the only argument, then all objects in the database will be loaded.
 Arguments and options can be used to restrict which objects will be loaded.
 
@@ -134,6 +137,11 @@ Workspace with 4-variables
   b ⇒ 10-element TSeries{Quarterly} with range 2020Q1:2022Q2
   c ⇒ Workspace with 3-variables
   s ⇒ Workspace with 2-variables
+
+julia> readfame("\"/home/usr/my data directory/data.db\"", "a", "b")   
+Workspace with 2-variables
+  a ⇒ 1.0
+  b ⇒ 10-element TSeries{Quarterly} with range 2020Q1:2022Q2
 
 ```
 
