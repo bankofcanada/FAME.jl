@@ -261,12 +261,19 @@ unfame(fo::FameObject{:series,:precision,FR}) where {FR} =
     TSeries(_date_to_mit(FR, fo.first_index[]), _unmissing!(fo.data, Val(:precision)))
 unfame(fo::FameObject{:series,:numeric,FR}) where {FR} =
     TSeries(_date_to_mit(FR, fo.first_index[]), _unmissing!(fo.data, Val(:numeric)))
-unfame(fo::FameObject{:series,:boolean,FR}) where {FR} =
-    TSeries(_date_to_mit(FR, fo.first_index[]), _unmissing!(fo.data, Val(:boolean)))
 unfame(fo::FameObject{:series,TY,FR}) where {TY,FR} =
     TSeries(_date_to_mit(FR, fo.first_index[]), [_date_to_mit(TY, d) for d in fo.data])
 unfame(fo::FameObject{:series,:string,FR}) where {FR} =
     copy(fo.data) # error("Can't handle string series")
+function unfame(fo::FameObject{:series,:boolean,FR}) where {FR}
+    if length(fo.data) == 1 && _ismissing(fo.data[1], Val(:boolean))
+        return TSeries(_date_to_mit(FR, fo.first_index[]), Vector{Bool}())
+    else
+        return TSeries(_date_to_mit(FR, fo.first_index[]), [d != 0 for d in fo.data])
+    end
+end
+    
+
 
 @inline _freq_from_fame(fr) =
     (
@@ -568,7 +575,7 @@ end
 function _unmissing!(x::Vector, v::Val{T}) where {T}
     # a single NaN value is an empty TSeries
     if length(x) == 1 && _ismissing(x[1], v)
-        return v == Val(:boolean) ? Vector{Bool}() : typeof(x)()
+        return typeof(x)()
     end
     nan = typenan(eltype(x))
     for i = eachindex(x)
