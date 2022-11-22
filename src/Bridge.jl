@@ -262,7 +262,7 @@ unfame(fo::FameObject{:series,:precision,FR}) where {FR} =
 unfame(fo::FameObject{:series,:numeric,FR}) where {FR} =
     TSeries(_date_to_mit(FR, fo.first_index[]), _unmissing!(fo.data, Val(:numeric)))
 unfame(fo::FameObject{:series,:boolean,FR}) where {FR} =
-    TSeries(_date_to_mit(FR, fo.first_index[]), [d != 0 for d in fo.data])
+    TSeries(_date_to_mit(FR, fo.first_index[]), _unmissing!(fo.data, Val(:boolean)))
 unfame(fo::FameObject{:series,TY,FR}) where {TY,FR} =
     TSeries(_date_to_mit(FR, fo.first_index[]), [_date_to_mit(TY, d) for d in fo.data])
 unfame(fo::FameObject{:series,:string,FR}) where {FR} =
@@ -481,8 +481,8 @@ end
 
 function refame(name::Symbol, value::TSeries)
     if isempty(value)
-        fr = _freq_to_fame(frequencyof(value))
-        find = lind = FAME_INDEX_NC
+        (fr, find) = _mit_to_date(firstdate(value))
+        lind = find
     else
         (fr, find) = _mit_to_date(firstdate(value))
         lind = find + length(value) - 1
@@ -505,6 +505,16 @@ function refame(name::Symbol, value::TSeries)
         val = map(value.values) do v
             v = convert(Float64, v)
             istypenan(v) ? FPRCNC : v
+        end
+    end
+    # empty TSeries have a single NaN value
+    if isempty(value)
+        if ElType == Float32
+            val = [FNUMNA]
+        elseif ElType == Bool
+            val = [FBOONA]
+        elseif ElType == Float64 || !(ElType <: MIT)
+            val = [FPRCNA]
         end
     end
     return FameObject{:series,ty,fr,typeof(val)}(
@@ -556,6 +566,10 @@ function _unmissing!(x::Ref, v::Val{T}) where {T}
 end
 
 function _unmissing!(x::Vector, v::Val{T}) where {T}
+    # a single NaN value is an empty TSeries
+    if length(x) == 1 && _ismissing(x[1], v)
+        return v == Val(:boolean) ? Vector{Bool}() : typeof(x)()
+    end
     nan = typenan(eltype(x))
     for i = eachindex(x)
         if _ismissing(x[i], v)

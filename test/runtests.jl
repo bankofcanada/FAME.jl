@@ -68,3 +68,25 @@ end
         end
     end
 end
+
+@testset "empty tseries" begin
+    w = Workspace(; 
+        t1 = TSeries(1995Q1),
+        t2 = TSeries(1993Q3, Vector{Float32}()),
+        t3 = TSeries(1996Q2, Vector{Bool}())
+    )
+    writefame("data.db", w)
+    @test length(listdb("data.db")) == 3
+
+    wr = readfame("data.db")
+
+    @test typeof(wr.t1) == TSeries{Quarterly, Float64, Vector{Float64}}
+    @test typeof(wr.t2) == TSeries{Quarterly, Float32, Vector{Float32}}
+    @test typeof(wr.t3) == TSeries{Quarterly, Bool, Vector{Bool}}
+    @test wr.t1.firstdate == 1995Q1
+    @test wr.t2.firstdate == 1993Q3
+    @test wr.t3.firstdate == 1996Q2
+    @test length(wr.t1) == 0
+    @test length(wr.t2) == 0
+    @test length(wr.t3) == 0
+end
