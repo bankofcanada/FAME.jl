@@ -261,13 +261,18 @@ unfame(fo::FameObject{:series,:precision,FR}) where {FR} =
     TSeries(_date_to_mit(FR, fo.first_index[]), _unmissing!(fo.data, Val(:precision)))
 unfame(fo::FameObject{:series,:numeric,FR}) where {FR} =
     TSeries(_date_to_mit(FR, fo.first_index[]), _unmissing!(fo.data, Val(:numeric)))
-unfame(fo::FameObject{:series,TY,FR}) where {TY,FR} =
-    TSeries(_date_to_mit(FR, fo.first_index[]), [_date_to_mit(TY, d) for d in fo.data])
 unfame(fo::FameObject{:series,:string,FR}) where {FR} =
     copy(fo.data) # error("Can't handle string series")
+function unfame(fo::FameObject{:series,TY,FR}) where {TY,FR}
+    if length(fo.data) == 1 && _ismissing(fo.data[1], Val(:FR))
+        TSeries(MIT{_freq_from_fame(TY)}, _date_to_mit(FR, fo.first_index[]))
+    else
+        return TSeries(_date_to_mit(FR, fo.first_index[]), [_date_to_mit(TY, d) for d in fo.data])
+    end
+end
 function unfame(fo::FameObject{:series,:boolean,FR}) where {FR}
     if length(fo.data) == 1 && _ismissing(fo.data[1], Val(:boolean))
-        return TSeries(_date_to_mit(FR, fo.first_index[]), Vector{Bool}())
+        return TSeries(Bool, _date_to_mit(FR, fo.first_index[]))
     else
         return TSeries(_date_to_mit(FR, fo.first_index[]), [d != 0 for d in fo.data])
     end
@@ -487,13 +492,7 @@ end
     error("Cannot write type $(typeof(value)) to FAME database.")
 
 function refame(name::Symbol, value::TSeries)
-    if isempty(value)
-        (fr, find) = _mit_to_date(firstdate(value))
-        lind = find
-    else
-        (fr, find) = _mit_to_date(firstdate(value))
-        lind = find + length(value) - 1
-    end
+    (fr, find) = _mit_to_date(firstdate(value))
     ElType = eltype(value)
     if ElType == Float32
         ty = :numeric
@@ -514,16 +513,19 @@ function refame(name::Symbol, value::TSeries)
             istypenan(v) ? FPRCNC : v
         end
     end
-    # empty TSeries have a single NaN value
-    if isempty(value)
+    # empty TSeries have a single NaN 
+    if isempty(val)
         if ElType == Float32
-            val = [FNUMNA]
+            push!(val, FNUMNA)
         elseif ElType == Bool
-            val = [FBOONA]
-        elseif ElType == Float64 || !(ElType <: MIT)
-            val = [FPRCNA]
+            push!(val, FBOONA)
+        elseif ElType <: MIT
+            push!(val, FAME_INDEX_NA)
+        else # default to float64
+            push!(val, FPRCNA)
         end
     end
+    lind = find + length(val) - 1
     return FameObject{:series,ty,fr,typeof(val)}(
         string(name), Ref(find), Ref(lind), val)
 end
@@ -575,7 +577,7 @@ end
 function _unmissing!(x::Vector, v::Val{T}) where {T}
     # a single NaN value is an empty TSeries
     if length(x) == 1 && _ismissing(x[1], v)
-        return typeof(x)()
+        return empty!(x)
     end
     nan = typenan(eltype(x))
     for i = eachindex(x)
