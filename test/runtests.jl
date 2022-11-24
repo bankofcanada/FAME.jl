@@ -71,6 +71,9 @@ end
 end
 
 @testset "empty tseries" begin
+    FAME.init_chli()
+    test_db = workdb()
+
     w = Workspace(; 
         t1 = TSeries(1995Q1),
         t2 = TSeries(Float32, 1993Q3),
@@ -79,10 +82,10 @@ end
         t5 = TSeries(MIT{Yearly}, 1998Q3),
         t6 = TSeries(1997Q1, Vector{MIT{Yearly}}([2022Y, 2023Y]))
     )
-    writefame("empty_series_test.db", w)
-    @test length(listdb("empty_series_test.db")) == 6
+    writefame(test_db, w)
+    @test length(listdb(test_db)) == 6
 
-    wr = readfame("empty_series_test.db")
+    wr = readfame(test_db)
    
     @test typeof(wr.t1) == TSeries{Quarterly, Float64, Vector{Float64}}
     @test typeof(wr.t2) == TSeries{Quarterly, Float32, Vector{Float32}}
@@ -105,5 +108,4 @@ end
     @test wr.t4.values == [true, false, true]
     @test wr.t6.values == [2022Y, 2023Y]
 
-    rm("empty_series_test.db")
 end
