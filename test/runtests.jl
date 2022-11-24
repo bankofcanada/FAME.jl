@@ -59,7 +59,8 @@ end
     pr[2020Q4] = NaN
     nu = TSeries(2020Q1, randn(Float32, 8))
     nu[2020Q4] = NaN
-    writefame(workdb(), Workspace(; pr, nu))
+    test_db = workdb()
+    writefame(test_db, Workspace(; pr, nu))
     for n in ("pr", "nu")
         let b = IOBuffer()
             fame(b, "disp $n")
@@ -67,4 +68,44 @@ end
             @test sum(Base.Fix1(occursin, r"20:4\s+NC"), readlines(b)) == 1
         end
     end
+end
+
+@testset "empty tseries" begin
+    FAME.init_chli()
+    test_db = workdb()
+
+    w = Workspace(; 
+        t1 = TSeries(1995Q1),
+        t2 = TSeries(Float32, 1993Q3),
+        t3 = TSeries(Bool, 1996Q2),
+        t4 = TSeries(1996Q2, Vector{Bool}([true, false, true])),
+        t5 = TSeries(MIT{Yearly}, 1998Q3),
+        t6 = TSeries(1997Q1, Vector{MIT{Yearly}}([2022Y, 2023Y]))
+    )
+    writefame(test_db, w)
+    @test length(listdb(test_db)) == 6
+
+    wr = readfame(test_db)
+   
+    @test typeof(wr.t1) == TSeries{Quarterly, Float64, Vector{Float64}}
+    @test typeof(wr.t2) == TSeries{Quarterly, Float32, Vector{Float32}}
+    @test typeof(wr.t3) == TSeries{Quarterly, Bool, Vector{Bool}}
+    @test typeof(wr.t4) == TSeries{Quarterly, Bool, Vector{Bool}}
+    @test typeof(wr.t5) == TSeries{Quarterly, MIT{Yearly}, Vector{MIT{Yearly}}}
+    @test typeof(wr.t6) == TSeries{Quarterly, MIT{Yearly}, Vector{MIT{Yearly}}}
+    @test wr.t1.firstdate == 1995Q1
+    @test wr.t2.firstdate == 1993Q3
+    @test wr.t3.firstdate == 1996Q2
+    @test wr.t4.firstdate == 1996Q2
+    @test wr.t5.firstdate == 1998Q3
+    @test wr.t6.firstdate == 1997Q1
+    @test length(wr.t1) == 0
+    @test length(wr.t2) == 0
+    @test length(wr.t3) == 0
+    @test length(wr.t4) == 3
+    @test length(wr.t5) == 0
+    @test length(wr.t6) == 2
+    @test wr.t4.values == [true, false, true]
+    @test wr.t6.values == [2022Y, 2023Y]
+
 end
