@@ -264,7 +264,7 @@ unfame(fo::FameObject{:series,:numeric,FR}) where {FR} =
 unfame(fo::FameObject{:series,:string,FR}) where {FR} =
     copy(fo.data) # error("Can't handle string series")
 function unfame(fo::FameObject{:series,TY,FR}) where {TY,FR}
-    if length(fo.data) == 1 && _ismissing(fo.data[1], Val(:FR))
+    if length(fo.data) == 1 && _ismissing(fo.data[1], Val(TY))
         TSeries(MIT{_freq_from_fame(TY)}, _date_to_mit(FR, fo.first_index[]))
     else
         return TSeries(_date_to_mit(FR, fo.first_index[]), [_date_to_mit(TY, d) for d in fo.data])
