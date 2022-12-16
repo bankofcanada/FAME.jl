@@ -283,7 +283,7 @@ from_fame_frequencies_map = Dict(
     :annual     => from_fame_yearly_map,
     :case       => Unit,
     :daily      => Daily,
-    :business   => BusinessDaily,
+    :business   => BDaily,
     :weekly     => from_fame_weekly_map
 )
 
@@ -348,7 +348,7 @@ to_fame_frequencies_map = Dict{Type, Symbol}(
     Monthly         => :monthly,
     Weekly          => :weekly_sunday,
     Daily           => :daily,
-    BusinessDaily   => :business,
+    BDaily   => :business,
 )
 
 function _freq_to_fame(F::Type{<:Quarterly{N}})  where N
