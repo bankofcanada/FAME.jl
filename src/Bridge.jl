@@ -308,7 +308,11 @@ function _date_to_mit(fr, date)
     @fame_call_check(fame_index_to_year_period,
         (Cint, FameIndex, Ref{Cint}, Ref{Cint}),
         val_to_int(fr, fame_freq), date, y, p)
-    return MIT{F}(y[], p[])
+    if F <: Weekly
+        return TimeSeriesEcon._weekly_from_yp(F, y[], p[])
+    else
+        return MIT{F}(y[], p[])
+    end
 end
 
 
@@ -381,7 +385,11 @@ function _mit_to_date(x::MIT{F}) where {F<:Frequency}
     if istypenan(x)
         return (fr, FAME_INDEX_NC)
     end
-    yr, p = mit2yp(x)
+    if F <: Weekly
+        yr, p = TimeSeriesEcon._mit2yp(x)
+    else
+        yr, p = mit2yp(x)
+    end
     index = Ref{FameIndex}(-1)
     @fame_call_check(fame_year_period_to_index,
         (Cint, Ref{FameIndex}, Cint, Cint),
