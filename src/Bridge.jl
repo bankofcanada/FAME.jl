@@ -152,14 +152,14 @@ function _readfame!(ret, ident, fo, db)
 end
 
 # If db is given as a string
-@inline readfame(dbname::AbstractString, args...; kwargs...) =
+@inline readfame(dbname, args...; kwargs...) =
     opendb(dbname) do db
         readfame(db, args...; kwargs...)
     end
 # if list of names is not given
 readfame(db::FameDatabase; kwargs...) = readfame(db, "?"; kwargs...)
 # The other cases
-function readfame(db::FameDatabase, args...; namecase = lowercase, prefix = nothing, collect = [], glue = "_", kwargs...)
+function readfame(db::FameDatabase, args...; namecase=lowercase, prefix=nothing, collect=[], glue="_", kwargs...)
     if collect isa Union{AbstractString,Symbol,Pair{<:Union{AbstractString,Symbol},<:Any}}
         collect = [collect]
     end
@@ -167,28 +167,51 @@ function readfame(db::FameDatabase, args...; namecase = lowercase, prefix = noth
     for wc in args
         fos = _iswildcard(wc) ? listdb(db, wc; kwargs...) : [quick_info(db, wc)]
         for fo in fos
-            dest, name = _destination(ret, fo.name, glue, prefix, collect...)
+            dest, name = _destination(ret, fo.name, glue, namecase, prefix, collect...)
             _readfame!(dest, Symbol(namecase(name)), fo, db)
         end
     end
     return ret
+    ### experimental (write metadata for mvtseries, so we can load them as mvtseries)
+    # return _ws_to_mvts(ret)
 end
+
+### experimental (write metadata for mvtseries, so we can load them as mvtseries)
+# _ws_to_mvts(any) = any
+# function _ws_to_mvts(w::Workspace)
+#     names = get(w, :mvtseries_colnames, nothing)
+#     if names === nothing
+#         for (k,v) in w
+#             w[k] = _ws_to_mvts(v)
+#         end
+#         return w
+#     end
+#     names = Symbol.(split(names, ','))
+#     return MVTSeries(rangeof(w[names]); pairs(w[names])...)
+# end
 
 _iswildcard(wc) = occursin('?', wc) || occursin('^', wc)
 
-_remove_prefix(name, pref) = startswith(name, pref) ? replace(name, pref => ""; count = 1) : name
+_remove_prefix(name, pref) = startswith(name, pref) ? replace(name, pref => ""; count=1) : name
 # Handle the prefix argument
-_destination(ret, name, glue, prefix::AbstractString, args...) = _destination(ret, _remove_prefix(name, uppercase(string(prefix) * glue)), glue, nothing, args...)
+_destination(ret, name, glue, namecase, prefix::AbstractString, args...) = _destination(ret, _remove_prefix(name, uppercase(string(prefix) * glue)), glue, namecase, nothing, args...)
 # Recursion on the collect arguments
-_destination(ret, name, glue, ::Nothing) = (ret, name)
-_destination(ret, name, glue, ::Nothing, W::Any, args...) = error("Invalid type of W: $(typeof(W))")
-_destination(ret, name, glue, ::Nothing, W::Union{Symbol,AbstractString}, args...) = _destination(ret, name, glue, nothing, W => [], args...)
-@inline function _destination(ret, name, glue, ::Nothing, (Wpref, Wargs)::Pair{<:Union{Symbol,AbstractString},<:Any}, args...)
+_destination(ret, name, glue, namecase, ::Nothing) = (ret, name)
+_destination(ret, name, glue, namecase, ::Nothing, W::Any, args...) = error("Invalid type of W: $(typeof(W))")
+_destination(ret, name, glue, namecase, ::Nothing, W::Union{Symbol,AbstractString}, args...) = _destination(ret, name, glue, namecase, nothing, W => [], args...)
+@inline function _destination(ret, name, glue, namecase, ::Nothing, (Wpref, Collect)::Pair{<:Union{Symbol,AbstractString},<:Any}, args...)
+    parts = split(name, glue)
+    if length(parts) > 1 && (Wpref == "?" || Wpref == "*")
+        Wpref = namecase(parts[1])
+    end
     pref = uppercase(string(Wpref) * glue)
     if startswith(name, pref)
-        return _destination(get!(ret, Symbol(Wpref), Workspace()), replace(name, pref => ""; count = 1), glue, nothing, Wargs...)
+        if Collect isa Union{Symbol,AbstractString}
+            Collect = [Collect]
+        end
+        return _destination(get!(ret, Symbol(Wpref), Workspace()), join(parts[2:end], glue), glue, namecase, nothing, Collect...)
     else
-        return _destination(ret, name, glue, nothing, args...)
+        return _destination(ret, name, glue, namecase, nothing, args...)
     end
 end
 
@@ -449,22 +472,35 @@ function _writefame(db, iterable, prefix, glue)
         if prefix !== nothing
             name = Symbol(prefix, glue, name)
         end
-        if value isa Union{Workspace,MVTSeries}
-            _writefame(db, pairs(value), name, glue) #= glue= =#
-        else
-            try
-                fo = refame(name, value)
-                do_write(fo, db)
-            catch e
-                @info "Failed to write $(name): $(sprint(showerror, e))" e
-                continue
-            end
-        end
+        _writefame_one(db, value, name, glue)
     end
 end
 
+function _writefame_one(db, value::Workspace, name, glue)
+    _writefame(db, pairs(value), name, glue)
+    return
+end
+
+function _writefame_one(db, value::MVTSeries, name, glue)
+    _writefame(db, pairs(value), name, glue)
+    ### experimental (write metadata for mvtseries, so we can load them as mvtseries)
+    # nms = join(colnames(value), ",")
+    # _writefame(db, [(:mvtseries_colnames => nms),], name, glue)
+    return
+end
+
+function _writefame_one(db, value, name, glue)
+    try
+        fo = refame(name, value)
+        do_write(fo, db)
+    catch e
+        @info "Failed to write $(name): $(sprint(showerror, e))" e
+    end
+    return
+end
+
 # If database is given as a string
-@inline writefame(dbname::AbstractString, data...; mode = :overwrite, kwargs...) =
+@inline writefame(dbname::AbstractString, data...; mode=:overwrite, kwargs...) =
     opendb(dbname, mode) do db
         writefame(db, data...; kwargs...)
     end
@@ -477,9 +513,9 @@ const _FameWritable = Union{MVTSeries,Workspace}
 
 # write a list of MVTSeries and Workspace
 writefame(db::FameDatabase, data::_FameWritable...; kwargs...) = writefame(db, data; kwargs...)
-@inline function writefame(db::FameDatabase, data::Tuple{_FameWritable,Vararg{_FameWritable}}; prefix = nothing, glue = "_")
-    for d in data
-        _writefame(db, pairs(d), prefix, glue)
+@inline function writefame(db::FameDatabase, data::Tuple{_FameWritable,Vararg{_FameWritable}}; prefix=nothing, glue="_")
+    for value in data
+        _writefame_one(db, value, prefix, glue)
     end
 end
 
@@ -559,16 +595,16 @@ function refame(name::Symbol, value::TSeries)
     ElType = eltype(value)
     if ElType == Float32
         ty = :numeric
-        val = [istypenan(v) ? FNUMNC : v for v in value.values]
+        val = Float32[istypenan(v) ? FNUMNC : v for v in value.values]
     elseif ElType == Float64
         ty = :precision
-        val = [istypenan(v) ? FPRCNC : v for v in value.values]
+        val = Float64[istypenan(v) ? FPRCNC : v for v in value.values]
     elseif ElType <: MIT
         ty = _freq_to_fame(frequencyof(ElType))
-        val = [_mit_to_date(x)[2] for x in value.values]
+        val = FameIndex[_mit_to_date(x)[2] for x in value.values]
     elseif ElType == Bool
         ty = :boolean
-        val = [Int32(x) for x in value.values]
+        val = Int32[x for x in value.values]
     else
         ty = :precision
         val = map(value.values) do v
