@@ -17,6 +17,9 @@ Read data from FAME database into Julia. The data is returned in a
 `db` is a [`FameDatabase`](@ref) or a `String`. If `db` is a `String`, the
 database will be opened in `:readonly` mode and closed after loading the data.
 
+If the db string containing a path to a file, the path should be encapsulated in 
+escaped double quotes whenever the path contains spaces.
+
 If `db` is the only argument, then all objects in the database will be loaded.
 Arguments and options can be used to restrict which objects will be loaded.
 
@@ -134,6 +137,11 @@ Workspace with 4-variables
   b ⇒ 10-element TSeries{Quarterly} with range 2020Q1:2022Q2
   c ⇒ Workspace with 3-variables
   s ⇒ Workspace with 2-variables
+
+julia> readfame("\"/home/usr/my data directory/data.db\"", "a", "b")   
+Workspace with 2-variables
+  a ⇒ 1.0
+  b ⇒ 10-element TSeries{Quarterly} with range 2020Q1:2022Q2
 
 ```
 
@@ -253,26 +261,38 @@ unfame(fo::FameObject{:series,:precision,FR}) where {FR} =
     TSeries(_date_to_mit(FR, fo.first_index[]), _unmissing!(fo.data, Val(:precision)))
 unfame(fo::FameObject{:series,:numeric,FR}) where {FR} =
     TSeries(_date_to_mit(FR, fo.first_index[]), _unmissing!(fo.data, Val(:numeric)))
-unfame(fo::FameObject{:series,:boolean,FR}) where {FR} =
-    TSeries(_date_to_mit(FR, fo.first_index[]), [d != 0 for d in fo.data])
-unfame(fo::FameObject{:series,TY,FR}) where {TY,FR} =
-    TSeries(_date_to_mit(FR, fo.first_index[]), [_date_to_mit(TY, d) for d in fo.data])
 unfame(fo::FameObject{:series,:string,FR}) where {FR} =
     copy(fo.data) # error("Can't handle string series")
+function unfame(fo::FameObject{:series,TY,FR}) where {TY,FR}
+    if length(fo.data) == 1 && _ismissing(fo.data[1], Val(TY))
+        TSeries(MIT{_freq_from_fame(TY)}, _date_to_mit(FR, fo.first_index[]))
+    else
+        return TSeries(_date_to_mit(FR, fo.first_index[]), [_date_to_mit(TY, d) for d in fo.data])
+    end
+end
+function unfame(fo::FameObject{:series,:boolean,FR}) where {FR}
+    if length(fo.data) == 1 && _ismissing(fo.data[1], Val(:boolean))
+        return TSeries(Bool, _date_to_mit(FR, fo.first_index[]))
+    else
+        return TSeries(_date_to_mit(FR, fo.first_index[]), [d != 0 for d in fo.data])
+    end
+end
+    
+
 
 from_fame_quarterly_map = Dict(
     :january    => Quarterly{1},
     :february   => Quarterly{2},
-    :march      => Quarterly,
+    :march      => Quarterly{3},
     :april      => Quarterly{1},
     :may        => Quarterly{2},
-    :june       => Quarterly,
+    :june       => Quarterly{3},
     :july       => Quarterly{1},
     :august     => Quarterly{2},
-    :september  => Quarterly,
+    :september  => Quarterly{3},
     :october    => Quarterly{1},
     :november   => Quarterly{2},
-    :december   => Quarterly
+    :december   => Quarterly{3}
 )
 
 from_fame_yearly_map = Dict(
@@ -287,7 +307,22 @@ from_fame_yearly_map = Dict(
     :september  => Yearly{9},
     :october    => Yearly{10},
     :november   => Yearly{11},
-    :december   => Yearly
+    :december   => Yearly{12}
+)
+
+from_fame_halfyearly_map = Dict(
+    :january    => HalfYearly{1},
+    :february   => HalfYearly{2},
+    :march      => HalfYearly{3},
+    :april      => HalfYearly{4},
+    :may        => HalfYearly{5},
+    :june       => HalfYearly{6},
+    :july       => HalfYearly{1},
+    :august     => HalfYearly{2},
+    :september  => HalfYearly{3},
+    :october    => HalfYearly{4},
+    :november   => HalfYearly{5},
+    :december   => HalfYearly{6}
 )
 
 from_fame_weekly_map = Dict(
@@ -304,6 +339,7 @@ from_fame_frequencies_map = Dict(
     :quarterly  => from_fame_quarterly_map,
     :monthly    => Monthly,
     :annual     => from_fame_yearly_map,
+    :semiannual => from_fame_halfyearly_map,
     :case       => Unit,
     :daily      => Daily,
     :business   => BDaily,
@@ -359,6 +395,14 @@ to_fame_yearly_map = Dict{Integer, Symbol}(
     11  => :annual_november,
     12  => :annual_december,
 )
+to_fame_halfyearly_map = Dict{Integer, Symbol}(
+    1   => :semiannual_july,
+    2   => :semiannual_august,
+    3   => :semiannual_september,
+    4   => :semiannual_october,
+    5   => :semiannual_november,
+    6   => :semiannual_december,
+)
 to_fame_weekly_map = Dict{Integer, Symbol}(
     1   => :weekly_monday,
     2   => :weekly_tuesday,
@@ -371,16 +415,23 @@ to_fame_weekly_map = Dict{Integer, Symbol}(
 to_fame_frequencies_map = Dict{Type, Symbol}(
     Unit            => :case,
     Yearly          => :annual_december,
+    HalfYearly      => :semiannual_december,
     Quarterly       => :quarterly_december,
     Monthly         => :monthly,
     Weekly          => :weekly_sunday,
     Daily           => :daily,
-    BDaily   => :business,
+    BDaily          => :business,
 )
 
 function _freq_to_fame(F::Type{<:Quarterly{N}})  where N
     if N ∈ keys(to_fame_quarterly_map)
         return to_fame_quarterly_map[N]
+    end
+    return error("Cannot convert TimeSeriesEcon frequency $F to a FAME frequency.");
+end
+function _freq_to_fame(F::Type{<:HalfYearly{N}})  where N
+    if N ∈ keys(to_fame_halfyearly_map)
+        return to_fame_halfyearly_map[N]
     end
     return error("Cannot convert TimeSeriesEcon frequency $F to a FAME frequency.");
 end
@@ -585,13 +636,7 @@ end
     error("Cannot write type $(typeof(value)) to FAME database.")
 
 function refame(name::Symbol, value::TSeries)
-    if isempty(value)
-        fr = _freq_to_fame(frequencyof(value))
-        find = lind = FAME_INDEX_NC
-    else
-        (fr, find) = _mit_to_date(firstdate(value))
-        lind = find + length(value) - 1
-    end
+    (fr, find) = _mit_to_date(firstdate(value))
     ElType = eltype(value)
     if ElType == Float32
         ty = :numeric
@@ -612,6 +657,19 @@ function refame(name::Symbol, value::TSeries)
             istypenan(v) ? FPRCNC : v
         end
     end
+    # empty TSeries have a single NaN 
+    if isempty(val)
+        if ElType == Float32
+            push!(val, FNUMNA)
+        elseif ElType == Bool
+            push!(val, FBOONA)
+        elseif ElType <: MIT
+            push!(val, FAME_INDEX_NA)
+        else # default to float64
+            push!(val, FPRCNA)
+        end
+    end
+    lind = find + length(val) - 1
     return FameObject{:series,ty,fr,typeof(val)}(
         string(name), Ref(find), Ref(lind), val)
 end
@@ -661,6 +719,10 @@ function _unmissing!(x::Ref, v::Val{T}) where {T}
 end
 
 function _unmissing!(x::Vector, v::Val{T}) where {T}
+    # a single NaN value is an empty TSeries
+    if length(x) == 1 && _ismissing(x[1], v)
+        return empty!(x)
+    end
     nan = typenan(eltype(x))
     for i = eachindex(x)
         if _ismissing(x[i], v)
