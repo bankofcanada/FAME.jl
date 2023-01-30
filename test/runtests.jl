@@ -70,6 +70,83 @@ end
     end
 end
 
+frequency_to_name(F::Type) = lowercase(replace(replace(String(Symbol(F)), "{" => ""), "}" => ""))
+@testset "writing and reading all frequencies" begin
+    frequencies = [
+        Daily,
+        BDaily,
+        Weekly,
+        Weekly{1},
+        Weekly{2},
+        Weekly{3},
+        Weekly{4},
+        Weekly{5},
+        Weekly{6},
+        # Weekly{7}
+        Monthly,
+        Quarterly,
+        Quarterly{1},
+        Quarterly{2},
+        # Quarterly{3},
+        HalfYearly,
+        HalfYearly{1},
+        HalfYearly{2},
+        HalfYearly{3},
+        HalfYearly{4},
+        HalfYearly{5},
+        # HalfYearly{6},
+        Yearly,
+        Yearly{1},
+        Yearly{2},
+        Yearly{3},
+        Yearly{4},
+        Yearly{5},
+        Yearly{6},
+        Yearly{7},
+        Yearly{8},
+        Yearly{9},
+        Yearly{10},
+        Yearly{11},
+        # Yearly{12}
+    ]
+    counter = 1
+    db_write = Workspace()
+    for F in frequencies
+        subcounter = 1
+        for i in 1:500
+            year = rand(collect(1970:2030))
+            month = rand(collect(1:12))
+            day = rand(collect(1:28))
+            if F == Daily
+                t = TSeries(daily("$year-$month-$day"), collect(1:800))
+            elseif F <: BDaily
+                t = TSeries(bdaily("$year-$month-$day", bias=:previous), collect(1:600))
+            elseif F <: Weekly
+                t = TSeries(weekly("$year-$month-$day", TimeSeriesEcon.endperiod(F)), collect(1:200))
+                # t = TSeries(fconvert(F, daily("$year-$month-$day")), collect(1:200))
+            elseif F <: Yearly
+                t = TSeries(MIT{F}(year), collect(1:40))
+            elseif F <: HalfYearly
+                t = TSeries(MIT{F}(year), collect(1:40))
+            elseif F <: Monthly
+                t = TSeries(MIT{F}(year*12 + month), collect(1:40))
+            elseif F <: Quarterly
+                t = TSeries(MIT{F}(year*4 + month), collect(1:40))
+            end
+    
+            db_write[Symbol("t_$(frequency_to_name(F))_$subcounter")] = t
+            db_write[Symbol("mit_$(frequency_to_name(F))_$subcounter")] = t.firstdate
+            subcounter += 1
+        end
+        counter += 1       
+    end
+    writefame("db_write.db", db_write)
+    db_read = readfame(joinpath(pwd(), "db_write.db"));
+    @test compare(db_write, db_read) == true
+
+    rm("db_write.db")
+end
+
 @testset "empty tseries" begin
     FAME.init_chli()
     test_db = workdb()
@@ -79,20 +156,27 @@ end
         t2 = TSeries(Float32, 1993Q3),
         t3 = TSeries(Bool, 1996Q2),
         t4 = TSeries(1996Q2, Vector{Bool}([true, false, true])),
-        t5 = TSeries(MIT{Yearly}, 1998Q3),
-        t6 = TSeries(1997Q1, Vector{MIT{Yearly}}([2022Y, 2023Y]))
+        t5 = TSeries(MIT{Yearly{12}}, 1998Q3),
+        t6 = TSeries(1997Q1, Vector{MIT{Yearly{12}}}([2022Y, 2023Y]))
     )
     writefame(test_db, w)
     @test length(listdb(test_db)) == 6
 
     wr = readfame(test_db)
    
-    @test typeof(wr.t1) == TSeries{Quarterly, Float64, Vector{Float64}}
-    @test typeof(wr.t2) == TSeries{Quarterly, Float32, Vector{Float32}}
-    @test typeof(wr.t3) == TSeries{Quarterly, Bool, Vector{Bool}}
-    @test typeof(wr.t4) == TSeries{Quarterly, Bool, Vector{Bool}}
-    @test typeof(wr.t5) == TSeries{Quarterly, MIT{Yearly}, Vector{MIT{Yearly}}}
-    @test typeof(wr.t6) == TSeries{Quarterly, MIT{Yearly}, Vector{MIT{Yearly}}}
+    @test isquarterly(wr.t1) == true
+    @test isquarterly(wr.t2) == true
+    @test isquarterly(wr.t3) == true
+    @test isquarterly(wr.t4) == true
+    @test isquarterly(wr.t5) == true
+    @test isquarterly(wr.t6) == true
+    @test eltype(wr.t1) <: Float64
+    @test eltype(wr.t2) <: Float32
+    @test eltype(wr.t3) <: Bool
+    @test eltype(wr.t4) <: Bool
+    @test eltype(wr.t5) <: MIT{Yearly{12}}
+    @test eltype(wr.t6) <: MIT{Yearly{12}}
+    
     @test wr.t1.firstdate == 1995Q1
     @test wr.t2.firstdate == 1993Q3
     @test wr.t3.firstdate == 1996Q2
