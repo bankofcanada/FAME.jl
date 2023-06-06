@@ -23,6 +23,18 @@ try    # ============================================
         return (hval, code, msg)
     end
 
+    function check_table(tbl)
+        try
+            rows = get_elements_by_tagname(tbl, "tr")
+            (hval, code, msg) = do_row(rows[2])
+            # @assert hval isa String && code isa Int32 && msg isa String
+            return true
+        catch e
+            return false
+        end
+    end
+
+
     find_table(els::Array) = isempty(els) ? nothing : (z = filter(!isequal(nothing), find_table.(els)); length(z) == 0 ? nothing : length(z) == 1 ? z[1] : z)
     find_table(el::XMLElement) = name(el) == "table" ? el : find_table(collect(child_elements(el)))
 
@@ -33,6 +45,14 @@ try    # ============================================
         # Read and parse the help file
         xdoc = parse_file(help_file)
         table = find_table(root(xdoc))
+        if table isa Array
+            for tbl in table
+                if check_table(tbl)
+                    table = tbl
+                    break;
+                end
+            end
+        end
         @assert table !== nothing && isa(table, XMLElement)
         table_rows = get_elements_by_tagname(table, "tr")
         table_rows = table_rows[2:end]
@@ -54,11 +74,11 @@ catch e # ============================================
     # use a stub - these are the status codes we explicitly use in our code.
     open("./FAMEMessages.jl", "w") do f
         println(f, "\n# This file is autogenerted.  Do not edit.")
-        println(f, "\n\nchli_help_file = ", "not found")
+        println(f, "\n\nchli_help_file = ", "\"not found\"")
         println(f, "\nchli_status_description = Dict{Int32, String}(")
-        println(f, "    0 => ", "Success.")
-        println(f, "    13 => ", "The given object does not exist.")
-        println(f, "    67 => ", "Bad option.")
+        println(f, "    0 => ", "\"Success.\",")
+        println(f, "    13 => ", "\"The given object does not exist.\",")
+        println(f, "    67 => ", "\"Bad option.\",")
         println(f, ")\n\n")
         println(f, "global const HSUCC = Int32(0)")
         println(f, "global const HNOOBJ = Int32(13)")
