@@ -197,15 +197,24 @@ end
 @testset "tuples" begin
     data = Workspace(;
         svec=["qmazing", "qmazing", "p", "phantastic"],
-        stup=("qmazing", "qmazing", "p", "phantastic")
+        stup=("qmazing", "qmazing", "p", "phantastic"),
+        nl_empty="{}",
+        nl_1=uppercase("{a}"),
+        nl=uppercase("{a,hello,b,world}"),
     )
     rm("test.db", force=true)
     try
         writefame("test.db", data)
         data_r = readfame("test.db")
+        @test length(data_r) == length(data)
+        @test keys(data_r) == keys(data)
         @test data_r.svec == data.svec
         # string tuples are read into string vectors
         @test data_r.stup == String[data.stup...]
+        @test data_r.nl_empty == "{}"
+        @test data_r.nl_1 == data.nl_1
+        split_namelist(nl) = split(nl[2:end-1], (',', ' '), keepempty=false)
+        @test split_namelist(data_r.nl) == split_namelist(data.nl)
     finally
         rm("test.db", force=true)
     end

@@ -70,11 +70,13 @@ function unsafe_read!!(::Val{:namelist}, key, name, range, vals)
     @cfm_call_check(cfmnlen,
         (Cint, Cstring, Cint, Ref{Cint}),
         key, name, HNLALL, len)
-    # len[] += 1
-    vals[] = repeat("\0", len[])
+    # add room for '\0' at the end
+    vals[] = repeat("\0", len[]+1)
     @cfm_call_check(cfmgtnl,
         (Cint, Cstring, Cint, Ptr{UInt8}, Cint, Ref{Cint}),
         key, name, HNLALL, vals[], len[], len)
+    # remove trailing '\0' from the end
+    vals[] = vals[][1:len[]]
     return vals
 end
 
