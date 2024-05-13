@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2022, Bank of Canada
+# Copyright (c) 2020-2024, Bank of Canada
 # All rights reserved.
 
 """
@@ -44,12 +44,13 @@ function unsafe_read!!(::Val{:string}, key, name, range, vals::AbstractVector{St
     @fame_call_check(fame_len_strings,
         (Cint, Cstring, Ptr{FameRange}, Ref{Int32}),
         key, name, range, lens)
-    for ind in eachindex(lens)
-        vals[ind] = repeat("\0", lens[ind])
-    end
+    # allocate string and make room for the trailing '\0'
+    map!(len -> repeat("\0", len + 1), vals, lens)
     @fame_call_check(fame_get_strings,
         (Cint, Cstring, Ptr{FameRange}, Ptr{Ptr{UInt8}}, Ref{Int32}, Ptr{Int32}),
         key, name, range, vals, lens, C_NULL)
+    # strip trailing '\0'
+    map!((len, val) -> val[1:len], vals, lens, vals)
     return vals
 end
 
