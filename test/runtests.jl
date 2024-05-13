@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2022, Bank of Canada
+# Copyright (c) 2020-2024, Bank of Canada
 # All rights reserved.
 
 using Test
@@ -14,10 +14,10 @@ if FAME.chli.lib === nothing
 end
 
 @testset "workspaces" begin
-    w = Workspace(; a = 1, b = TSeries(2020Q1, randn(10)),
-        s = MVTSeries(2020M1, (:q, :p), randn(24, 2)),
-        c = Workspace(; alpha = 0.1, beta = 0.8,
-            n = Workspace(; s = "Hello World")
+    w = Workspace(; a=1, b=TSeries(2020Q1, randn(10)),
+        s=MVTSeries(2020M1, (:q, :p), randn(24, 2)),
+        c=Workspace(; alpha=0.1, beta=0.8,
+            n=Workspace(; s="Hello World")
         ))
     writefame("data.db", w)
     @test length(listdb("data.db")) == 7
@@ -30,17 +30,17 @@ end
     @test tmp isa Workspace && length(tmp) == 2
     @test issubset(keys(tmp), (:s_p, :s_q))
 
-    tmp = readfame("data.db", "s?", prefix = "s")
+    tmp = readfame("data.db", "s?", prefix="s")
     @test tmp isa Workspace && length(tmp) == 2
     @test issubset(keys(tmp), (:p, :q))
 
-    tmp = readfame("data.db", "c?", collect = "c")
+    tmp = readfame("data.db", "c?", collect="c")
     @test tmp isa Workspace && length(tmp) == 1
     @test issubset(keys(tmp), (:c,))
     @test tmp.c isa Workspace && length(tmp.c) == 3
     @test issubset(keys(tmp.c), (:alpha, :beta, :n_s))
 
-    tmp = readfame("data.db", collect = ["c" => ["n"], "s"])
+    tmp = readfame("data.db", collect=["c" => ["n"], "s"])
     @test tmp isa Workspace && length(tmp) == 4
     @test issubset(keys(tmp), (:a, :b, :c, :s))
     @test tmp.c isa Workspace && length(tmp.c) == 3
@@ -129,20 +129,20 @@ frequency_to_name(F::Type) = lowercase(replace(replace(String(Symbol(F)), "{" =>
             elseif F <: HalfYearly
                 t = TSeries(MIT{F}(year), collect(1:40))
             elseif F <: Monthly
-                t = TSeries(MIT{F}(year*12 + month), collect(1:40))
+                t = TSeries(MIT{F}(year * 12 + month), collect(1:40))
             elseif F <: Quarterly
-                t = TSeries(MIT{F}(year*4 + month), collect(1:40))
+                t = TSeries(MIT{F}(year * 4 + month), collect(1:40))
             end
-    
+
             db_write[Symbol("t_$(frequency_to_name(F))_$subcounter")] = t
             db_write[Symbol("mit_$(frequency_to_name(F))_$subcounter")] = t.firstdate
             subcounter += 1
         end
-        counter += 1       
+        counter += 1
     end
     writefame("db_write.db", db_write)
-    db_read = readfame(joinpath(pwd(), "db_write.db"));
-    @test compare(db_write, db_read) == true
+    db_read = readfame(joinpath(pwd(), "db_write.db"))
+    @test compare(db_write, db_read, quiet=true)
 
     rm("db_write.db")
 end
@@ -151,19 +151,19 @@ end
     FAME.init_chli()
     test_db = workdb()
 
-    w = Workspace(; 
-        t1 = TSeries(1995Q1),
-        t2 = TSeries(Float32, 1993Q3),
-        t3 = TSeries(Bool, 1996Q2),
-        t4 = TSeries(1996Q2, Vector{Bool}([true, false, true])),
-        t5 = TSeries(MIT{Yearly{12}}, 1998Q3),
-        t6 = TSeries(1997Q1, Vector{MIT{Yearly{12}}}([2022Y, 2023Y]))
+    w = Workspace(;
+        t1=TSeries(1995Q1),
+        t2=TSeries(Float32, 1993Q3),
+        t3=TSeries(Bool, 1996Q2),
+        t4=TSeries(1996Q2, Vector{Bool}([true, false, true])),
+        t5=TSeries(MIT{Yearly{12}}, 1998Q3),
+        t6=TSeries(1997Q1, Vector{MIT{Yearly{12}}}([2022Y, 2023Y]))
     )
     writefame(test_db, w)
     @test length(listdb(test_db)) == 6
 
     wr = readfame(test_db)
-   
+
     @test isquarterly(wr.t1) == true
     @test isquarterly(wr.t2) == true
     @test isquarterly(wr.t3) == true
@@ -176,7 +176,7 @@ end
     @test eltype(wr.t4) <: Bool
     @test eltype(wr.t5) <: MIT{Yearly{12}}
     @test eltype(wr.t6) <: MIT{Yearly{12}}
-    
+
     @test wr.t1.firstdate == 1995Q1
     @test wr.t2.firstdate == 1993Q3
     @test wr.t3.firstdate == 1996Q2
@@ -192,4 +192,30 @@ end
     @test wr.t4.values == [true, false, true]
     @test wr.t6.values == [2022Y, 2023Y]
 
+end
+
+@testset "tuples" begin
+    data = Workspace(;
+        svec=["qmazing", "qmazing", "p", "phantastic"],
+        stup=("qmazing", "qmazing", "p", "phantastic"),
+        nl_empty="{}",
+        nl_1=uppercase("{a}"),
+        nl=uppercase("{a,hello,b,world}"),
+    )
+    rm("test.db", force=true)
+    try
+        writefame("test.db", data)
+        data_r = readfame("test.db")
+        @test length(data_r) == length(data)
+        @test keys(data_r) == keys(data)
+        @test data_r.svec == data.svec
+        # string tuples are read into string vectors
+        @test data_r.stup == String[data.stup...]
+        @test data_r.nl_empty == "{}"
+        @test data_r.nl_1 == data.nl_1
+        split_namelist(nl) = split(nl[2:end-1], (',', ' '), keepempty=false)
+        @test split_namelist(data_r.nl) == split_namelist(data.nl)
+    finally
+        rm("test.db", force=true)
+    end
 end
