@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2022, Bank of Canada
+# Copyright (c) 2020-2024, Bank of Canada
 # All rights reserved.
 
 using TimeSeriesEcon
@@ -627,6 +627,12 @@ function refame(name::Symbol, value::String)
 end
 
 function refame(name::Symbol, value::AbstractVector{<:AbstractString})
+    return FameObject{:series,:string,:case,Vector{String}}(
+        string(name), Ref(1), Ref(length(value)), String[value...]
+    )
+end
+
+function refame(name::Symbol, value::NTuple{N, <:AbstractString}) where {N}
     return FameObject{:series,:string,:case,Vector{String}}(
         string(name), Ref(1), Ref(length(value)), String[value...]
     )
